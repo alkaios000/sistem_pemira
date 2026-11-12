@@ -49,6 +49,9 @@ require BASE_PATH . '/views/layouts/header.php';
             <?php endforeach; ?>
         </select>
         <button type="button" class="btn btn--soft-primary btn--sm" onclick="forceRotateBoothToken()">Rotasi Token Baru</button>
+        <?php if (is_authenticated()): ?>
+            <a href="<?= e(route_url('manajemen_bilik')) ?>" class="btn btn--ghost btn--sm">Kelola Bilik Suara</a>
+        <?php endif; ?>
     </div>
 </section>
 
