@@ -180,3 +180,10 @@
 .progress-bar.purple  { background: var(--purple); }
 .progress-bar.warning { background: var(--warning); }
 .progress-bar.danger  { background: var(--danger); }
+
+@media (max-width: 640px) {
+    .kandidat-grid,
+    .bilik-grid {
+        grid-template-columns: 1fr;
+    }
+}

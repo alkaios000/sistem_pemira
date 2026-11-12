@@ -77,3 +77,16 @@
     top: 0;
     z-index: 20;
 }
+
+@media (max-width: 640px) {
+    .lc-standalone-topbar {
+        padding: 8px 14px;
+        height: auto;
+        min-height: 52px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .lc-cand-grid {
+        grid-template-columns: 1fr;
+    }
+}

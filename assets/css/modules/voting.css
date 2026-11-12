@@ -209,3 +209,23 @@
 .ballot-card.is-selected .ballot-action-indicator {
     color: var(--primary);
 }
+
+@media (max-width: 640px) {
+    .voting-topbar {
+        padding: 8px 14px;
+        height: auto;
+        min-height: 52px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .voting-container {
+        padding: 14px 14px 28px;
+    }
+    .voting-steps {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .ballot-grid {
+        grid-template-columns: 1fr;
+    }
+}

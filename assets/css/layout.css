@@ -581,6 +581,11 @@ body.has-drawer-open .drawer-backdrop {
     .d-topbar {
         padding: 0 14px;
     }
+    .topbar-actions {
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
     .content {
         padding: 16px 14px;
     }
@@ -589,10 +594,26 @@ body.has-drawer-open .drawer-backdrop {
         flex-direction: column;
         gap: 10px;
     }
+    .hero-actions {
+        flex-wrap: wrap;
+        width: 100%;
+    }
     .d-footer {
         flex-direction: column;
         align-items: flex-start;
         gap: 6px;
         padding: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 18px;
+    }
+    .crumbs span:not(.current):not(.sep) {
+        display: none;
+    }
+    .crumbs .sep {
+        display: none;
     }
 }
