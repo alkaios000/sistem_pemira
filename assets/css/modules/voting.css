@@ -1,0 +1,211 @@
+/* ==========================================================================
+   VOTING CSS - Adminator 2026 Redesign Bilik Pemilihan (Feature 4)
+   ========================================================================== */
+
+.voting-shell {
+    min-height: 100vh;
+    background: var(--bg-body);
+    display: flex;
+    flex-direction: column;
+}
+
+.voting-topbar {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: saturate(140%) blur(10px);
+    border-bottom: 1px solid var(--border);
+    height: 52px;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+}
+
+.voting-container {
+    max-width: 1080px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px 24px 32px;
+    flex: 1;
+}
+
+/* Stepper */
+.voting-steps {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.step-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: var(--bg-muted);
+    color: var(--t-muted);
+    border: 1px solid var(--border-soft);
+}
+
+.step-pill .num {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    color: var(--t-muted);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    display: grid;
+    place-items: center;
+}
+
+.step-pill.is-active {
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-color: rgba(37, 99, 235, 0.25);
+}
+
+.step-pill.is-active .num {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.step-pill.is-done {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.step-pill.is-done .num {
+    background: var(--success);
+    color: #ffffff;
+}
+
+/* Scanner Box */
+.scanner-card {
+    max-width: 500px;
+    margin: 12px auto 0;
+}
+
+.scanner-viewport {
+    width: 100%;
+    max-width: 340px;
+    min-height: 240px;
+    margin: 10px auto;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+/* Surat Suara Grid */
+.ballot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.ballot-card {
+    background: var(--bg-card);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ballot-card.is-selected {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+    box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.ballot-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ballot-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--bg-muted);
+    color: var(--t-base);
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+.ballot-card.is-selected .ballot-num {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.ballot-photo {
+    width: 54px;
+    height: 54px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    background: var(--bg-muted);
+    flex-shrink: 0;
+}
+
+.ballot-names {
+    font-family: var(--font-display);
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--t-base);
+    line-height: 1.25;
+}
+
+.ballot-sub {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--t-muted);
+    margin-top: 2px;
+}
+
+.ballot-visi {
+    font-size: 11.5px;
+    color: var(--t-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 8px 10px;
+    line-height: 1.45;
+}
+
+.ballot-action-indicator {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--t-muted);
+}
+
+.ballot-card.is-selected .ballot-action-indicator {
+    color: var(--primary);
+}

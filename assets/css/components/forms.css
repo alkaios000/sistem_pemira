@@ -1,0 +1,194 @@
+/* ==========================================================================
+   FORMS CSS - Adminator 2026 Redesign Form Controls & Alerts
+   ========================================================================== */
+
+.form-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid .span-2 {
+    grid-column: span 2;
+}
+
+.field,
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 12px;
+}
+
+.form-grid .field,
+.form-grid .form-group {
+    margin-bottom: 0;
+}
+
+.field-label,
+.form-label {
+    align-items: center;
+    color: var(--t-base);
+    display: flex;
+    font-size: 12px;
+    font-weight: 600;
+    justify-content: space-between;
+}
+
+.field-label .hint,
+.form-hint {
+    color: var(--t-light);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 400;
+}
+
+.field-hint {
+    color: var(--t-muted);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+.input,
+.select,
+.textarea,
+.form-input,
+.form-select,
+.form-textarea {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--t-base);
+    font-family: inherit;
+    font-size: 12.5px;
+    outline: 0;
+    padding: 7.5px 11px;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    width: 100%;
+}
+
+.input::placeholder,
+.textarea::placeholder,
+.form-input::placeholder,
+.form-textarea::placeholder {
+    color: var(--t-light);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus,
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.input:disabled,
+.select:disabled,
+.textarea:disabled,
+.form-input:disabled {
+    background: var(--bg-muted);
+    color: var(--t-muted);
+    cursor: not-allowed;
+}
+
+.select,
+.form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'><path d='m6 9 6 6 6-6'/></svg>");
+    background-position: right 10px center;
+    background-repeat: no-repeat;
+    padding-right: 30px;
+}
+
+.textarea,
+.form-textarea {
+    line-height: 1.5;
+    min-height: 80px;
+    resize: vertical;
+}
+
+.input-icon {
+    position: relative;
+}
+
+.input-icon .input {
+    padding-left: 32px;
+}
+
+.input-icon .ico {
+    color: var(--t-light);
+    display: grid;
+    left: 10px;
+    place-items: center;
+    pointer-events: none;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.input-icon .ico svg {
+    fill: none;
+    height: 13px;
+    stroke: currentColor;
+    stroke-width: 2;
+    width: 13px;
+}
+
+/* Alerts (Adminator 2026) */
+.alert {
+    align-items: flex-start;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    display: flex;
+    font-size: 12.5px;
+    gap: 10px;
+    line-height: 1.45;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+}
+
+.alert-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.alert-title {
+    font-weight: 600;
+    margin-bottom: 1px;
+}
+
+.alert.info, .alert-info {
+    background: var(--info-soft);
+    border-color: rgba(14, 165, 233, 0.22);
+    color: #0369a1;
+}
+
+.alert.success, .alert-success {
+    background: var(--success-soft);
+    border-color: rgba(16, 185, 129, 0.22);
+    color: #047857;
+}
+
+.alert.warning, .alert-warning {
+    background: var(--warning-soft);
+    border-color: rgba(245, 158, 11, 0.25);
+    color: #b45309;
+}
+
+.alert.danger, .alert-danger {
+    background: var(--danger-soft);
+    border-color: rgba(239, 68, 68, 0.22);
+    color: #b91c1c;
+}
+
+@media (max-width: 640px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .form-grid .span-2 {
+        grid-column: span 1;
+    }
+}

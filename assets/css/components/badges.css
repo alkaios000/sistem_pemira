@@ -1,0 +1,86 @@
+/* ==========================================================================
+   BADGES CSS - Adminator 2026 Redesign Badges & Tags
+   ========================================================================== */
+
+.badge {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    gap: 5px;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    padding: 2.5px 8.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.badge.dot::before {
+    background: currentColor;
+    border-radius: 50%;
+    content: "";
+    height: 5px;
+    width: 5px;
+    flex-shrink: 0;
+}
+
+.badge.primary,
+.badge-primary {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.badge.success,
+.badge-success {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.badge.warning,
+.badge-warning {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.badge.danger,
+.badge-danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.badge.info,
+.badge-info {
+    background: var(--info-soft);
+    color: var(--info);
+}
+
+.badge.purple {
+    background: var(--purple-soft);
+    color: var(--purple);
+}
+
+.badge.neutral,
+.badge-neutral {
+    background: var(--bg-muted);
+    color: var(--t-muted);
+}
+
+.badge.outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--t-muted);
+}
+
+.tag {
+    align-items: center;
+    background: var(--bg-muted);
+    border-radius: 6px;
+    color: var(--t-base);
+    display: inline-flex;
+    font-size: 11.5px;
+    font-weight: 500;
+    gap: 5px;
+    padding: 3px 8px;
+}

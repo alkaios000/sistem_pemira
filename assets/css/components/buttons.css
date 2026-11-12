@@ -1,0 +1,180 @@
+/* ==========================================================================
+   BUTTONS CSS - Adminator 2026 Redesign Buttons
+   ========================================================================== */
+
+.btn {
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 12.5px;
+    font-weight: 600;
+    gap: 6px;
+    justify-content: center;
+    line-height: 1.2;
+    padding: 7px 13px;
+    transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+    white-space: nowrap;
+}
+
+.btn svg {
+    fill: none;
+    height: 13px;
+    stroke: currentColor;
+    stroke-width: 2;
+    width: 13px;
+    flex-shrink: 0;
+}
+
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+/* Primary Solid (Soft Blue) */
+.btn--primary,
+.btn-primary {
+    background: var(--primary);
+    box-shadow: 0 2px 5px -1px var(--primary-ring);
+    color: #ffffff;
+}
+
+.btn--primary:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-dark);
+}
+
+/* Ghost / Outline */
+.btn--ghost,
+.btn-outline {
+    background: var(--bg-card);
+    border-color: var(--border);
+    color: var(--t-base);
+}
+
+.btn--ghost:hover:not(:disabled),
+.btn-outline:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--t-light);
+}
+
+/* Soft Tinted Variants */
+.btn--soft-primary,
+.btn-soft {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.btn--soft-primary:hover:not(:disabled),
+.btn-soft:hover:not(:disabled) {
+    background: #dbeafe;
+}
+
+.btn--soft-success {
+    background: var(--success-soft);
+    color: #047857;
+}
+
+.btn--soft-success:hover:not(:disabled) {
+    background: #d1fae5;
+}
+
+.btn--soft-warning {
+    background: var(--warning-soft);
+    color: #b45309;
+}
+
+.btn--soft-danger,
+.btn-danger-soft {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.btn--soft-danger:hover:not(:disabled),
+.btn-danger-soft:hover:not(:disabled) {
+    background: #fee2e2;
+}
+
+/* Solid Semantic Variants */
+.btn--success {
+    background: var(--success);
+    color: #ffffff;
+}
+
+.btn--success:hover:not(:disabled) {
+    background: #059669;
+}
+
+.btn--danger,
+.btn-danger {
+    background: var(--danger);
+    color: #ffffff;
+}
+
+.btn--danger:hover:not(:disabled),
+.btn-danger:hover:not(:disabled) {
+    background: #dc2626;
+}
+
+.btn--warning {
+    background: var(--warning);
+    color: #ffffff;
+}
+
+/* Sizes */
+.btn--sm,
+.btn-sm {
+    border-radius: 6px;
+    font-size: 11.5px;
+    padding: 5px 10px;
+}
+
+.btn--xs,
+.btn-xs {
+    border-radius: 5px;
+    font-size: 11px;
+    padding: 3px 8px;
+}
+
+.btn--lg,
+.btn-lg {
+    border-radius: 9px;
+    font-size: 13.5px;
+    padding: 9px 16px;
+}
+
+.btn--icon {
+    border-radius: 7px;
+    height: 30px;
+    padding: 0;
+    width: 30px;
+    display: inline-grid;
+    place-items: center;
+}
+
+.btn-block {
+    width: 100%;
+}
+
+.btn-group {
+    display: inline-flex;
+}
+
+.btn-group .btn {
+    border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+    border-bottom-left-radius: 7px;
+    border-top-left-radius: 7px;
+}
+
+.btn-group .btn:last-child {
+    border-bottom-right-radius: 7px;
+    border-top-right-radius: 7px;
+}
+
+.btn-group .btn + .btn {
+    margin-left: -1px;
+}

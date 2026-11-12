@@ -1,0 +1,79 @@
+/* ==========================================================================
+   LIVE COUNT CSS - Adminator 2026 Redesign Live Count (Feature 6)
+   ========================================================================== */
+
+.lc-cand-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.lc-cand-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    padding: 15px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.lc-cand-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.lc-cand-photo {
+    width: 44px;
+    height: 44px;
+    border-radius: 9px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.lc-cand-stat {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-top: 1px dashed var(--border-soft);
+    padding-top: 8px;
+}
+
+.lc-cand-votes {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--t-base);
+    letter-spacing: -0.025em;
+}
+
+.lc-cand-pct {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.chart-box {
+    position: relative;
+    width: 100%;
+    height: 250px;
+}
+
+/* Standalone Live Count Mode (When not logged in as Admin) */
+.lc-standalone-topbar {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: saturate(140%) blur(10px);
+    border-bottom: 1px solid var(--border);
+    height: 52px;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}

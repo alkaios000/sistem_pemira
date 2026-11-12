@@ -1,0 +1,31 @@
+# Matikan Directory Listing
+Options -Indexes
+
+# Aktifkan Rewrite Engine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Blokir akses langsung ke folder internal
+    RewriteRule ^(config|app|models|views|middlewares|helpers|database)/ - [F,L]
+
+    # Blokir akses ke berkas sensitif dan dokumentasi di root
+    RewriteRule ^(\.env|\.env\.example|\.gitignore|rule\.md|app\.md|README\.md)$ - [F,L]
+
+    # Izinkan akses langsung ke berkas statis (assets & uploads) yang benar-benar ada
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteCond %{REQUEST_URI} (assets|uploads)/
+    RewriteRule ^ - [L]
+
+    # Arahkan seluruh request lainnya ke Single Entry Point index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Header Keamanan Dasar
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+

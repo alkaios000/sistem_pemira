@@ -1,0 +1,240 @@
+/* ==========================================================================
+   TABLES CSS - Adminator 2026 Redesign Data Table, Toolbar & Pagination
+   ========================================================================== */
+
+.data-toolbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.data-toolbar-left,
+.data-toolbar-right {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
+
+.data-toolbar-left {
+    flex: 1;
+    min-width: 220px;
+}
+
+.data-table-wrap {
+    overflow-x: auto;
+    margin: 0 -20px;
+}
+
+.data-table {
+    border-collapse: collapse;
+    font-size: 12.5px;
+    width: calc(100% - 40px);
+    margin: 0 20px;
+}
+
+.data-table thead th {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    color: var(--t-muted);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    padding: 9px 12px;
+    position: sticky;
+    text-align: left;
+    text-transform: uppercase;
+    top: 0;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.data-table thead th:hover {
+    color: var(--t-base);
+}
+
+.data-table thead th .sort {
+    display: inline-block;
+    height: 10px;
+    margin-left: 3px;
+    opacity: 0.4;
+    vertical-align: -1px;
+    width: 10px;
+}
+
+.data-table thead th.sorted-asc,
+.data-table thead th.sorted-desc {
+    color: var(--primary);
+}
+
+.data-table thead th.sorted-asc .sort,
+.data-table thead th.sorted-desc .sort {
+    opacity: 1;
+}
+
+.data-table tbody td {
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--t-base);
+    padding: 10px 12px;
+    vertical-align: middle;
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.data-row {
+    transition: background 0.14s ease;
+}
+
+.data-row:hover {
+    background: var(--bg-hover);
+}
+
+.data-row.is-selected {
+    background: var(--primary-soft);
+}
+
+.data-cell-user {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+}
+
+.data-cell-user-meta {
+    line-height: 1.25;
+    min-width: 0;
+}
+
+.data-cell-user-name {
+    color: var(--t-base);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.data-cell-user-email,
+.data-cell-mono {
+    color: var(--t-muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+}
+
+.data-cell-user-email {
+    font-size: 10.5px;
+}
+
+.data-cell-mono {
+    font-size: 11.5px;
+}
+
+.data-cell-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.data-foot {
+    align-items: center;
+    border-top: 1px solid var(--border-soft);
+    color: var(--t-muted);
+    display: flex;
+    font-size: 11.5px;
+    justify-content: space-between;
+    margin-top: 6px;
+    padding-top: 12px;
+}
+
+.data-foot-info {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+}
+
+.pager {
+    align-items: center;
+    display: flex;
+    gap: 3px;
+}
+
+.pager-btn {
+    border-radius: 6px;
+    color: var(--t-muted);
+    display: grid;
+    font-size: 11.5px;
+    font-weight: 600;
+    height: 28px;
+    min-width: 28px;
+    padding: 0 7px;
+    place-items: center;
+    transition: background 0.14s ease, color 0.14s ease;
+    border: 1px solid transparent;
+}
+
+.pager-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--t-base);
+    border-color: var(--border);
+}
+
+.pager-btn.is-active {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.pager-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+/* Mandatory Feature 5 Security Log Row Highlights */
+.data-table tbody tr.row-log-normal {
+    background-color: #f0fdf4;
+}
+
+.data-table tbody tr.row-log-normal:hover {
+    background-color: #dcfce7;
+}
+
+.data-table tbody tr.row-log-fraud {
+    background-color: #fef2f2;
+}
+
+.data-table tbody tr.row-log-fraud:hover {
+    background-color: #fee2e2;
+}
+
+.data-table tbody tr.row-log-fraud td:first-child {
+    box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.data-table tbody tr.row-log-normal td:first-child {
+    box-shadow: inset 3px 0 0 var(--success);
+}
+
+.table-empty {
+    padding: 28px 16px !important;
+    text-align: center;
+    color: var(--t-muted);
+    font-size: 12.5px;
+}
+
+@media (max-width: 720px) {
+    .data-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .data-toolbar-left,
+    .data-toolbar-right {
+        flex-wrap: wrap;
+    }
+    .data-foot {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+}

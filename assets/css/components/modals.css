@@ -1,0 +1,154 @@
+/* ==========================================================================
+   MODALS CSS - Adminator 2026 Redesign Modals & Tabs
+   ========================================================================== */
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(3px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.16s ease, visibility 0.16s ease;
+}
+
+.modal-backdrop.is-open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-dialog {
+    background: var(--bg-card);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 520px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(6px);
+    transition: transform 0.16s ease;
+}
+
+.modal-backdrop.is-open .modal-dialog {
+    transform: translateY(0);
+}
+
+.modal-dialog.modal-lg {
+    max-width: 740px;
+}
+
+.modal-dialog.modal-sm {
+    max-width: 400px;
+}
+
+.modal-head,
+.modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.modal-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--t-base);
+    letter-spacing: -0.015em;
+}
+
+.modal-close {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--t-muted);
+    display: grid;
+    place-items: center;
+    font-size: 15px;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    background: var(--bg-hover);
+    color: var(--t-base);
+}
+
+.modal-body {
+    padding: 16px 18px;
+    overflow-y: auto;
+    font-size: 12.5px;
+    color: var(--t-base);
+}
+
+.modal-foot,
+.modal-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border-soft);
+    background: var(--bg-hover);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Adminator Tabs (Pills & Underline) */
+.tabs {
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+
+.tab {
+    border-bottom: 2px solid transparent;
+    color: var(--t-muted);
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-bottom: -1px;
+    padding: 8px 12px;
+    transition: color 0.16s, border-color 0.16s;
+}
+
+.tab:hover {
+    color: var(--t-base);
+}
+
+.tab.is-active {
+    border-bottom-color: var(--primary);
+    color: var(--primary);
+}
+
+.tabs.pills {
+    background: var(--bg-muted);
+    border-bottom: 0;
+    border-radius: 8px;
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+}
+
+.tabs.pills .tab {
+    border: 0;
+    border-radius: 6px;
+    margin: 0;
+    padding: 6px 12px;
+}
+
+.tabs.pills .tab.is-active {
+    background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+    color: var(--t-base);
+}

@@ -1,0 +1,14 @@
+# Environment & Kredensial Lokal
+.env
+
+# Berkas Unggahan Dinamis Pengguna
+/uploads/foto_kandidat/*
+!/uploads/foto_kandidat/.gitkeep
+
+# Berkas Sistem & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+

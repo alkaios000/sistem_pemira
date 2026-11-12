@@ -1,0 +1,6 @@
+# Nonaktifkan eksekusi script di dalam direktori uploads
+Options -Indexes -ExecCGI
+<FilesMatch "\.(php|php5|php7|php8|phtml|pl|py|jsp|asp|sh|cgi|exe|bat|cmd)$">
+    Require all denied
+</FilesMatch>
+
