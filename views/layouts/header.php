@@ -37,7 +37,7 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
     <link rel="stylesheet" href="<?= e(asset_url('css/modules/dashboard.css')) ?>?v=13">
     <link rel="stylesheet" href="<?= e(asset_url('css/modules/portal_qr.css')) ?>?v=11">
     <link rel="stylesheet" href="<?= e(asset_url('css/modules/voting.css')) ?>?v=11">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/live_count.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/live_count.css')) ?>?v=12">
 
     <script>
         window.PEMIRA_CONFIG = {
