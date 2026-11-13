@@ -93,8 +93,11 @@ function fetchLiveCountData() {
     const container = document.getElementById('liveCountContainer');
     if (!container) return;
     const kategori = container.getAttribute('data-kategori') || 'BEM';
+    const isBpm = (kategori === 'BPM');
 
-    fetch(`${window.PEMIRA_CONFIG.baseUrl}/index.php?action=live_count&kategori=${encodeURIComponent(kategori)}`)
+    fetch(`${window.PEMIRA_CONFIG.baseUrl}/index.php?action=live_count&kategori=${encodeURIComponent(kategori)}`, {
+        headers: { 'Cache-Control': 'no-cache' }
+    })
         .then(res => res.json())
         .then(res => {
             if (!res.success || !res.data) return;
@@ -103,24 +106,71 @@ function fetchLiveCountData() {
             const elTotal = document.getElementById('lcTotalVotes');
             const elDpt = document.getElementById('lcTotalDpt');
             const elPct = document.getElementById('lcTurnoutPct');
+            const elCandCount = document.getElementById('lcTotalCandidatCount');
             const elUpdated = document.getElementById('lcLastUpdated');
+
+            const cands = d.kandidats || [];
 
             if (elTotal) elTotal.textContent = Number(d.total_suara_kandidat || 0).toLocaleString('id-ID');
             if (elDpt) elDpt.textContent = Number(d.total_dpt || 0).toLocaleString('id-ID');
             if (elPct) elPct.textContent = `${d.partisipasi_persen || 0}%`;
+            if (elCandCount) elCandCount.textContent = cands.length;
             if (elUpdated) elUpdated.textContent = `LIVE · ${(res.timestamp || '').split(' ')[1] || ''}`;
 
-            const cands = d.kandidats || [];
-            cands.forEach(c => {
-                const card = document.querySelector(`[data-cand-id="${c.id}"]`);
-                if (!card) return;
-                const numEl = card.querySelector('.cand-vote-num');
-                const pctEl = card.querySelector('.cand-vote-pct');
-                const barEl = card.querySelector('.cand-vote-bar');
-                if (numEl) numEl.textContent = Number(c.jumlah_suara || 0).toLocaleString('id-ID');
-                if (pctEl) pctEl.textContent = `${c.persentase}%`;
-                if (barEl) barEl.style.width = `${c.persentase}%`;
-            });
+            const cardsWrap = document.getElementById('lcCandidateCards');
+            if (cardsWrap) {
+                const existingIds = Array.from(cardsWrap.querySelectorAll('[data-cand-id]')).map(el => String(el.getAttribute('data-cand-id'))).join(',');
+                const incomingIds = cands.map(c => String(c.id)).join(',');
+
+                if (existingIds !== incomingIds) {
+                    cardsWrap.innerHTML = cands.map(c => {
+                        const fotoUrl = c.foto_path
+                            ? `${window.PEMIRA_CONFIG.baseUrl}/uploads/${c.foto_path}`
+                            : `${window.PEMIRA_CONFIG.baseUrl}/assets/img/default_candidate.svg`;
+                        const accentStyle = isBpm ? 'style="color:var(--purple);"' : '';
+                        const barClass = isBpm ? 'progress-bar purple cand-vote-bar' : 'progress-bar cand-vote-bar';
+                        return `
+                            <div class="lc-cand-card" data-cand-id="${c.id}">
+                                <div class="lc-cand-top">
+                                    <img src="${fotoUrl}" alt="Calon" class="lc-cand-photo">
+                                    <div>
+                                        <span class="kandidat-urut" ${accentStyle}>CALON #0${c.nomor_urut}</span>
+                                        <div class="fw-700 cand-name-label" style="font-size:13.5px;"></div>
+                                    </div>
+                                </div>
+                                <div class="lc-cand-stat">
+                                    <span class="lc-cand-votes"><span class="cand-vote-num">${Number(c.jumlah_suara || 0).toLocaleString('id-ID')}</span> <small class="text-muted" style="font-size:11px;font-weight:500;">suara</small></span>
+                                    <span class="lc-cand-pct cand-vote-pct" ${accentStyle}>${c.persentase}%</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="${barClass}" style="width: ${c.persentase}%;"></div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                cands.forEach(c => {
+                    const card = cardsWrap.querySelector(`[data-cand-id="${c.id}"]`);
+                    if (!card) return;
+                    const nameEl = card.querySelector('.cand-name-label') || card.querySelector('.lc-cand-top .fw-700');
+                    const urutEl = card.querySelector('.kandidat-urut, .eyebrow');
+                    const imgEl = card.querySelector('.lc-cand-photo');
+                    const numEl = card.querySelector('.cand-vote-num');
+                    const pctEl = card.querySelector('.cand-vote-pct');
+                    const barEl = card.querySelector('.cand-vote-bar');
+                    const fotoUrl = c.foto_path
+                        ? `${window.PEMIRA_CONFIG.baseUrl}/uploads/${c.foto_path}`
+                        : `${window.PEMIRA_CONFIG.baseUrl}/assets/img/default_candidate.svg`;
+
+                    if (nameEl) nameEl.textContent = c.nama_calon || '-';
+                    if (urutEl) urutEl.textContent = `CALON #0${c.nomor_urut}`;
+                    if (imgEl && imgEl.getAttribute('src') !== fotoUrl) imgEl.setAttribute('src', fotoUrl);
+                    if (numEl) numEl.textContent = Number(c.jumlah_suara || 0).toLocaleString('id-ID');
+                    if (pctEl) pctEl.textContent = `${c.persentase}%`;
+                    if (barEl) barEl.style.width = `${c.persentase}%`;
+                });
+            }
 
             initOrUpdateCharts(cands);
         })
@@ -129,5 +179,6 @@ function fetchLiveCountData() {
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchLiveCountData();
-    setInterval(fetchLiveCountData, 4000);
+    setInterval(fetchLiveCountData, 2000);
+    window.addEventListener('pemira:realtime-sync', fetchLiveCountData);
 });

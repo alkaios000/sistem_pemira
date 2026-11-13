@@ -4,18 +4,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-    --bg-body: #ffffff;
+    --bg-body: #f3f6fb;
     --bg-surface: #f8fafc;
     --bg-card: #ffffff;
     --bg-sidebar: #ffffff;
     --bg-hover: #f8fafc;
-    --bg-muted: #f1f5f9;
+    --bg-muted: #eef2f7;
     --t-base: #1e293b;
     --t-muted: #64748b;
     --t-light: #94a3b8;
     --t-inverse: #ffffff;
-    --border: #e4e8ef;
-    --border-soft: #eef1f5;
+    --border: #e5eaf2;
+    --border-soft: #eef2f7;
     --primary: #2563eb;
     --primary-light: #3b82f6;
     --primary-dark: #1d4ed8;
@@ -38,7 +38,7 @@
     --teal: #14b8a6;
     --teal-soft: #f0fdfa;
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-    --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
+    --shadow-card: 0 2px 8px -2px rgba(15, 23, 42, 0.05), 0 1px 3px -1px rgba(15, 23, 42, 0.03);
     --shadow-lg: 0 12px 32px -8px rgba(15, 23, 42, 0.12), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
     --radius-sm: 6px;
     --radius-md: 8px;

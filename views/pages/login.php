@@ -12,10 +12,10 @@ require BASE_PATH . '/views/layouts/header.php';
 <div class="auth-shell">
     <aside class="auth-aside">
         <div class="auth-aside-brand">
+            <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img">
             <span>Sistem PEMIRA</span>
         </div>
         <div class="auth-aside-body">
-            <div class="auth-aside-eyebrow">E-Voting · BEM & BPM</div>
             <h2 class="auth-aside-title">Sistem Pemilihan Raya Mahasiswa Terintegrasi.</h2>
             <p class="auth-aside-sub">Arsitektur Single-Use Dynamic QR Token per bilik, penguncian sesi otomatis (0ms), dan audit log deteksi kecurangan real-time.</p>
             <div class="auth-aside-stats">
@@ -42,7 +42,10 @@ require BASE_PATH . '/views/layouts/header.php';
     <main class="auth-main">
         <div class="auth-card">
             <div class="auth-head">
-                <span class="eyebrow">Otentikasi Panel</span>
+                <div class="d-flex align-center gap-2 mb-2">
+                    <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img-sm">
+                    <span class="fw-700" style="font-size:13.5px;">Sistem PEMIRA · UBW</span>
+                </div>
                 <h1 class="auth-title">Masuk ke Sistem</h1>
                 <p class="auth-sub">Gunakan akun Administrator KPU atau Panitia Pengawas TPS.</p>
             </div>

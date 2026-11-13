@@ -57,10 +57,30 @@ function upload_url(string $upload_path): string
 }
 
 /**
- * Melakukan pengalihan halaman HTTP (Redirect) dan menghentikan skrip
+ * Memeriksa apakah request berasal dari pemanggilan AJAX / Fetch Real-Time
+ */
+function is_ajax_request(): bool
+{
+    return (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string) $_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (!empty($_POST['_ajax']) && $_POST['_ajax'] === '1')
+        || (!empty($_GET['_ajax']) && $_GET['_ajax'] === '1');
+}
+
+/**
+ * Melakukan pengalihan halaman HTTP (Redirect) atau mengembalikan JSON bila dipanggil via AJAX Real-Time
  */
 function redirect(string $url): never
 {
+    if (is_ajax_request() && function_exists('get_flash') && function_exists('json_response')) {
+        $flash = get_flash();
+        $type = $flash['type'] ?? 'success';
+        $message = $flash['message'] ?? 'Perubahan berhasil disimpan.';
+        $is_ok = ($type !== 'danger');
+        json_response($is_ok, $message, [
+            'redirect_url' => $url,
+            'flash_type'   => $type,
+        ]);
+    }
     header('Location: ' . $url);
     exit;
 }

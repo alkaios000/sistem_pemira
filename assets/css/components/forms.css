@@ -4,7 +4,7 @@
 
 .form-grid {
     display: grid;
-    gap: 14px;
+    gap: 10px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -16,8 +16,8 @@
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    margin-bottom: 12px;
+    gap: 4px;
+    margin-bottom: 9px;
 }
 
 .form-grid .field,
@@ -30,7 +30,7 @@
     align-items: center;
     color: var(--t-base);
     display: flex;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 600;
     justify-content: space-between;
 }
@@ -39,14 +39,14 @@
 .form-hint {
     color: var(--t-light);
     font-family: var(--font-mono);
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 400;
 }
 
 .field-hint {
     color: var(--t-muted);
-    font-size: 11.5px;
-    line-height: 1.4;
+    font-size: 11px;
+    line-height: 1.35;
 }
 
 .input,
@@ -57,12 +57,12 @@
 .form-textarea {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--t-base);
     font-family: inherit;
-    font-size: 12.5px;
+    font-size: 12px;
     outline: 0;
-    padding: 7.5px 11px;
+    padding: 6px 10px;
     transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
     width: 100%;
 }

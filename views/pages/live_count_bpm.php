@@ -20,6 +20,7 @@ require BASE_PATH . '/views/layouts/header.php';
 <?php if ($isFullScreenLayout): ?>
 <header class="lc-standalone-topbar">
     <div class="d-flex align-center gap-2">
+        <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img-sm">
         <span class="fw-700">Sistem PEMIRA · Live Count BPM</span>
     </div>
     <div class="d-flex align-center gap-2">
@@ -32,10 +33,6 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <div id="liveCountContainer" data-kategori="BPM">
     <section class="hero">
-        <div class="hero-text">
-            <span class="eyebrow" style="color:var(--purple);">Real-Time · Fitur 6</span>
-            <h1 class="hero-title">Live Count Ketua Umum BPM</h1>
-        </div>
         <div class="hero-actions">
             <span class="badge success dot" id="lcLastUpdated">LIVE · <?= date('H:i:s') ?></span>
             <a href="<?= e(route_url('live_count_bem')) ?>" class="btn btn--ghost btn--sm">← Lihat BEM</a>
@@ -73,7 +70,7 @@ require BASE_PATH . '/views/layouts/header.php';
                 <span class="kpi-label">Calon Ketua BPM</span>
                 <span class="kpi-pill flat">BPM</span>
             </div>
-            <div class="kpi-value"><?= count($liveData['kandidats']) ?></div>
+            <div class="kpi-value" id="lcTotalCandidatCount"><?= count($liveData['kandidats']) ?></div>
             <div class="kpi-compare"><span>Kandidat bertanding</span></div>
         </div>
     </div>
@@ -106,7 +103,6 @@ require BASE_PATH . '/views/layouts/header.php';
         <section class="col-7 card">
             <div class="card-head">
                 <div class="card-title-wrap">
-                    <span class="eyebrow" style="color:var(--purple);">Distribusi Suara</span>
                     <h3 class="card-title">Grafik Batang Perolehan Suara BPM</h3>
                 </div>
             </div>
@@ -118,7 +114,6 @@ require BASE_PATH . '/views/layouts/header.php';
         <section class="col-5 card">
             <div class="card-head">
                 <div class="card-title-wrap">
-                    <span class="eyebrow" style="color:var(--purple);">Proporsi Persentase</span>
                     <h3 class="card-title">Rasio Suara Masuk BPM</h3>
                 </div>
             </div>

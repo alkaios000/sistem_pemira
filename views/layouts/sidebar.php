@@ -7,7 +7,9 @@ $role = $_SESSION['user_role'] ?? 'ADMIN';
 $userName = $_SESSION['nama_lengkap'] ?? 'Panitia PEMIRA';
 ?>
 <aside class="d-sidebar" id="appSidebar">
+    <canvas class="sidebar-node-canvas" id="sidebarNodeCanvas" aria-hidden="true"></canvas>
     <div class="brand">
+        <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img">
         <div class="brand-text">
             <div class="brand-name">Sistem PEMIRA</div>
             <div class="brand-tag">E-Voting BEM & BPM</div>
@@ -58,13 +60,4 @@ $userName = $_SESSION['nama_lengkap'] ?? 'Panitia PEMIRA';
             <span class="nav-badge">↗</span>
         </a>
     </nav>
-
-    <div class="sidebar-footer">
-        <div class="workspace">
-            <div class="workspace-text">
-                <div class="workspace-name"><?= e($userName) ?></div>
-                <div class="workspace-role"><?= e($role) ?></div>
-            </div>
-        </div>
-    </div>
 </aside>

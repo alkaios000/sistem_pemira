@@ -28,30 +28,28 @@ require BASE_PATH . '/views/layouts/header.php';
 ?>
 
 <section class="hero">
-    <div class="hero-text">
-        <span class="eyebrow">Infrastruktur TPS & Kontrol Token · Fitur 2</span>
-        <h1 class="hero-title">Manajemen Bilik Suara & Portal Token</h1>
-    </div>
     <div class="hero-actions">
-        <button type="button" class="btn btn--soft-primary btn--sm" id="btnToggleLiveBilik" data-live="1">Live Monitor: ON (4s)</button>
+        <button type="button" class="btn btn--soft-primary btn--sm" id="btnToggleLiveBilik" data-live="1">Live Sync: ON (2s)</button>
 
-        <form action="<?= e(action_url('bilik')) ?>" method="POST" style="display:inline;">
-            <?= csrf_field() ?>
-            <input type="hidden" name="sub_action" value="toggle_wajib_checkin">
-            <input type="hidden" name="wajib_checkin_panitia" value="<?= $wajibCheckin === '1' ? '0' : '1' ?>">
-            <button type="submit" class="btn btn--ghost btn--sm">
-                Check-In Meja: <?= $wajibCheckin === '1' ? 'Wajib' : 'Bebas' ?>
-            </button>
-        </form>
+        <span id="bilikHeroGlobalControls" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <form action="<?= e(action_url('bilik')) ?>" method="POST" style="display:inline;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="sub_action" value="toggle_wajib_checkin">
+                <input type="hidden" name="wajib_checkin_panitia" value="<?= $wajibCheckin === '1' ? '0' : '1' ?>">
+                <button type="submit" class="btn btn--ghost btn--sm">
+                    Check-In Meja: <?= $wajibCheckin === '1' ? 'Wajib' : 'Bebas' ?>
+                </button>
+            </form>
 
-        <form action="<?= e(action_url('bilik')) ?>" method="POST" style="display:inline;">
-            <?= csrf_field() ?>
-            <input type="hidden" name="sub_action" value="toggle_global_portal">
-            <input type="hidden" name="portal_status" value="<?= $globalPortal === 'BUKA' ? 'TUTUP' : 'BUKA' ?>">
-            <button type="submit" class="btn <?= $globalPortal === 'BUKA' ? 'btn--soft-danger' : 'btn--soft-success' ?> btn--sm">
-                <?= $globalPortal === 'BUKA' ? 'Tutup Semua Bilik (Global)' : 'Buka Semua Bilik (Global)' ?>
-            </button>
-        </form>
+            <form action="<?= e(action_url('bilik')) ?>" method="POST" style="display:inline;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="sub_action" value="toggle_global_portal">
+                <input type="hidden" name="portal_status" value="<?= $globalPortal === 'BUKA' ? 'TUTUP' : 'BUKA' ?>">
+                <button type="submit" class="btn <?= $globalPortal === 'BUKA' ? 'btn--soft-danger' : 'btn--soft-success' ?> btn--sm">
+                    <?= $globalPortal === 'BUKA' ? 'Tutup Semua Bilik (Global)' : 'Buka Semua Bilik (Global)' ?>
+                </button>
+            </form>
+        </span>
 
         <button type="button" class="btn btn--primary btn--sm" onclick="openCreateBilikModal()">+ Tambah Bilik</button>
     </div>
@@ -178,7 +176,7 @@ require BASE_PATH . '/views/layouts/header.php';
                             <td>
                                 <div class="data-cell-actions">
                                     <a href="<?= e(route_url('portal_qr', ['booth' => (int)$b['nomor_bilik']])) ?>" class="btn btn--soft-primary btn--xs">Buka Layar QR</a>
-                                    <form action="<?= e(action_url('bilik')) ?>" method="POST" onsubmit="return confirm('Reset token QR dan lepas kunci sesi bilik ini?');">
+                                    <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Reset token QR dan lepas kunci sesi bilik ini?">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="sub_action" value="force_reset_bilik">
                                         <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
@@ -196,7 +194,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                         </button>
                                     </form>
                                     <button type="button" class="btn btn--ghost btn--xs" onclick='openEditBilikModal(<?= json_encode($b, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>Edit</button>
-                                    <form action="<?= e(action_url('bilik')) ?>" method="POST" onsubmit="return confirm('Hapus bilik suara ini?');">
+                                    <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Hapus bilik suara ini?">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="sub_action" value="delete_bilik">
                                         <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
@@ -254,11 +252,12 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <script>
 function openCreateBilikModal() {
+    const nextNum = document.querySelectorAll('tr[data-bilik-row]').length + 1;
     document.getElementById('bilikModalTitle').textContent = 'Tambah Bilik Suara';
     document.getElementById('bilik_sub_action').value = 'create_bilik';
     document.getElementById('bilik_id').value = 0;
-    document.getElementById('bilik_nomor').value = <?= $totalBilik + 1 ?>;
-    document.getElementById('bilik_nama').value = '';
+    document.getElementById('bilik_nomor').value = nextNum;
+    document.getElementById('bilik_nama').value = 'Bilik Suara 0' + nextNum;
     document.getElementById('bilik_lokasi').value = 'Aula Utama Kampus';
     PemiraApp.openModal('bilikModal');
 }
@@ -275,89 +274,22 @@ function openEditBilikModal(b) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const btnLive = document.getElementById('btnToggleLiveBilik');
-    let timer = null;
-
-    async function pollBilikStatus() {
-        try {
-            const res = await fetch(`${window.PEMIRA_CONFIG.baseUrl}/index.php?action=bilik&sub_action=status_list_json`, {
-                headers: { 'Accept': 'application/json' }
-            });
-            const json = await res.json();
-            if (!json.status || !json.data || !Array.isArray(json.data.biliks)) return;
-
-            let idle = 0, inUse = 0, closed = 0;
-            json.data.biliks.forEach(b => {
-                if (b.status_bilik === 'IDLE') idle++;
-                else if (b.status_bilik === 'IN_USE') inUse++;
-                else closed++;
-
-                const tr = document.querySelector(`tr[data-bilik-row="${b.id}"]`);
-                if (!tr) return;
-                tr.setAttribute('data-status', b.status_bilik);
-
-                const statusTd = tr.querySelector('.cell-bilik-status');
-                if (statusTd) {
-                    if (b.status_bilik === 'CLOSED') {
-                        statusTd.innerHTML = '<span class="badge danger dot">CLOSED</span>';
-                    } else if (b.status_bilik === 'IN_USE') {
-                        statusTd.innerHTML = '<span class="badge primary dot">IN_USE</span>';
-                    } else {
-                        statusTd.innerHTML = '<span class="badge success dot">IDLE</span>';
-                    }
-                }
-
-                const tokenTd = tr.querySelector('.cell-bilik-token');
-                if (tokenTd) {
-                    const tok = b.current_token ? String(b.current_token).substring(0, 10).toUpperCase() + '...' : '-';
-                    let sub = '<div class="text-muted mono" style="font-size:10.5px;">Rotasi Otomatis 8s</div>';
-                    if (b.status_bilik === 'IN_USE') {
-                        sub = '<div class="text-muted mono" style="font-size:10.5px;color:var(--primary);">Sesi Aktif Terkunci</div>';
-                    } else if (b.status_bilik === 'CLOSED') {
-                        sub = '<div class="text-muted mono" style="font-size:10.5px;">Token Dijeda</div>';
-                    }
-                    tokenTd.innerHTML = `<div class="data-cell-mono fw-600">${tok}</div>${sub}`;
-                }
-
-                const nimTd = tr.querySelector('.cell-bilik-nim');
-                if (nimTd) {
-                    nimTd.innerHTML = `<span class="data-cell-mono fw-600">${b.active_nim || '-'}</span>`;
-                }
-
-                const suaraTd = tr.querySelector('.cell-bilik-suara');
-                if (suaraTd) {
-                    suaraTd.innerHTML = `<span class="data-cell-mono fw-600">${Number(b.total_suara_bilik || 0).toLocaleString('id-ID')}</span>`;
-                }
-            });
-
-            const elIdle = document.getElementById('kpiBilikIdle');
-            const elInUse = document.getElementById('kpiBilikInUse');
-            const elClosed = document.getElementById('kpiBilikClosed');
-            if (elIdle) elIdle.textContent = idle;
-            if (elInUse) elInUse.textContent = inUse;
-            if (elClosed) elClosed.textContent = closed;
-        } catch (err) {
-            // Silent ignore on polling
-        }
-    }
-
-    timer = setInterval(pollBilikStatus, 4000);
-
     if (btnLive) {
         btnLive.addEventListener('click', () => {
             const active = btnLive.getAttribute('data-live') === '1';
             if (active) {
                 btnLive.setAttribute('data-live', '0');
-                btnLive.textContent = 'Live Monitor: OFF';
+                btnLive.textContent = 'Live Sync: OFF';
                 btnLive.classList.remove('btn--soft-primary');
                 btnLive.classList.add('btn--ghost');
-                if (timer) clearInterval(timer);
+                window.PEMIRA_LIVE_SYNC_PAUSED = true;
             } else {
                 btnLive.setAttribute('data-live', '1');
-                btnLive.textContent = 'Live Monitor: ON (4s)';
+                btnLive.textContent = 'Live Sync: ON (2s)';
                 btnLive.classList.remove('btn--ghost');
                 btnLive.classList.add('btn--soft-primary');
-                pollBilikStatus();
-                timer = setInterval(pollBilikStatus, 4000);
+                window.PEMIRA_LIVE_SYNC_PAUSED = false;
+                if (typeof PemiraApp.syncCurrentPage === 'function') PemiraApp.syncCurrentPage();
             }
         });
     }

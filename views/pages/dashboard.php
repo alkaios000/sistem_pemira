@@ -35,10 +35,6 @@ require BASE_PATH . '/views/layouts/header.php';
 ?>
 
 <section class="hero">
-    <div class="hero-text">
-        <span class="eyebrow">Workspace · Overview</span>
-        <h1 class="hero-title">Dashboard Eksekutif PEMIRA</h1>
-    </div>
     <div class="hero-actions">
         <span class="badge <?= $globalPortal === 'BUKA' ? 'success' : 'danger' ?> dot">Portal <?= e($globalPortal) ?></span>
         <a href="<?= e(route_url('portal_qr')) ?>" class="btn btn--soft-primary btn--sm">Portal QR Bilik</a>
@@ -104,7 +100,6 @@ require BASE_PATH . '/views/layouts/header.php';
     <section class="col-6 card">
         <div class="card-head">
             <div class="card-title-wrap">
-                <span class="eyebrow">BEM · Presiden & Wapres</span>
                 <h3 class="card-title">Perolehan Suara BEM</h3>
             </div>
             <span class="badge primary"><?= number_format($bemSummary['total_suara_kandidat']) ?> Suara</span>
@@ -113,7 +108,7 @@ require BASE_PATH . '/views/layouts/header.php';
             <?php foreach ($bemSummary['kandidats'] as $cand): ?>
                 <div>
                     <div class="d-flex justify-between align-center mb-1">
-                        <span class="fw-600">#0<?= (int)$cand['nomor_urut'] ?> · <?= e($cand['nama_calon']) ?><?= !empty($cand['nama_wakil']) ? ' & ' . e($cand['nama_wakil']) : '' ?></span>
+                        <span class="fw-600">#0<?= (int)$cand['nomor_urut'] ?> · <?= e($cand['nama_calon']) ?></span>
                         <span class="mono"><?= number_format((int)$cand['jumlah_suara']) ?> (<?= e($cand['persentase']) ?>%)</span>
                     </div>
                     <div class="progress">
@@ -127,7 +122,6 @@ require BASE_PATH . '/views/layouts/header.php';
     <section class="col-6 card">
         <div class="card-head">
             <div class="card-title-wrap">
-                <span class="eyebrow" style="color:var(--purple);">BPM · Ketua Umum</span>
                 <h3 class="card-title">Perolehan Suara BPM</h3>
             </div>
             <span class="badge purple"><?= number_format($bpmSummary['total_suara_kandidat']) ?> Suara</span>
@@ -151,7 +145,6 @@ require BASE_PATH . '/views/layouts/header.php';
     <section class="col-12 card">
         <div class="card-head">
             <div class="card-title-wrap">
-                <span class="eyebrow">Demografi Pemilih · DPT</span>
                 <h3 class="card-title">Partisipasi Suara per Kelas, Jurusan & Semester</h3>
             </div>
             <a href="<?= e(route_url('manajemen_mahasiswa')) ?>" class="btn btn--ghost btn--sm">Kelola DPT</a>
@@ -211,7 +204,6 @@ require BASE_PATH . '/views/layouts/header.php';
     <section class="col-12 card">
         <div class="card-head">
             <div class="card-title-wrap">
-                <span class="eyebrow">Audit Trail · Real-Time</span>
                 <h3 class="card-title">Aktivitas & Log Keamanan Terbaru</h3>
             </div>
             <a href="<?= e(route_url('log_keamanan')) ?>" class="btn btn--ghost btn--sm">Lihat Semua</a>

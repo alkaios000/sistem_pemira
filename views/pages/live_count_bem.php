@@ -20,6 +20,7 @@ require BASE_PATH . '/views/layouts/header.php';
 <?php if ($isFullScreenLayout): ?>
 <header class="lc-standalone-topbar">
     <div class="d-flex align-center gap-2">
+        <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img-sm">
         <span class="fw-700">Sistem PEMIRA · Live Count BEM</span>
     </div>
     <div class="d-flex align-center gap-2">
@@ -32,10 +33,6 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <div id="liveCountContainer" data-kategori="BEM">
     <section class="hero">
-        <div class="hero-text">
-            <span class="eyebrow">Real-Time · Fitur 6</span>
-            <h1 class="hero-title">Live Count Presiden & Wapres BEM</h1>
-        </div>
         <div class="hero-actions">
             <span class="badge success dot" id="lcLastUpdated">LIVE · <?= date('H:i:s') ?></span>
             <a href="<?= e(route_url('live_count_bpm')) ?>" class="btn btn--ghost btn--sm">Lihat BPM →</a>
@@ -70,10 +67,10 @@ require BASE_PATH . '/views/layouts/header.php';
         </div>
         <div class="kpi-card">
             <div class="kpi-top">
-                <span class="kpi-label">Pasangan Calon</span>
+                <span class="kpi-label">Calon Presiden BEM</span>
                 <span class="kpi-pill flat">BEM</span>
             </div>
-            <div class="kpi-value"><?= count($liveData['kandidats']) ?></div>
+            <div class="kpi-value" id="lcTotalCandidatCount"><?= count($liveData['kandidats']) ?></div>
             <div class="kpi-compare"><span>Kandidat bertanding</span></div>
         </div>
     </div>
@@ -84,10 +81,10 @@ require BASE_PATH . '/views/layouts/header.php';
             <?php $fotoUrl = !empty($c['foto_path']) ? upload_url($c['foto_path']) : asset_url('img/default_candidate.svg'); ?>
             <div class="lc-cand-card" data-cand-id="<?= (int)$c['id'] ?>">
                 <div class="lc-cand-top">
-                    <img src="<?= e($fotoUrl) ?>" alt="Paslon" class="lc-cand-photo">
+                    <img src="<?= e($fotoUrl) ?>" alt="Calon" class="lc-cand-photo">
                     <div>
-                        <span class="eyebrow">PASLON #0<?= (int)$c['nomor_urut'] ?></span>
-                        <div class="fw-700" style="font-size:13.5px;"><?= e($c['nama_calon']) ?><?= !empty($c['nama_wakil']) ? ' & ' . e($c['nama_wakil']) : '' ?></div>
+                        <span class="eyebrow">CALON #0<?= (int)$c['nomor_urut'] ?></span>
+                        <div class="fw-700" style="font-size:13.5px;"><?= e($c['nama_calon']) ?></div>
                     </div>
                 </div>
                 <div class="lc-cand-stat">
@@ -106,7 +103,6 @@ require BASE_PATH . '/views/layouts/header.php';
         <section class="col-7 card">
             <div class="card-head">
                 <div class="card-title-wrap">
-                    <span class="eyebrow">Distribusi Suara</span>
                     <h3 class="card-title">Grafik Batang Perolehan Suara BEM</h3>
                 </div>
             </div>
@@ -118,7 +114,6 @@ require BASE_PATH . '/views/layouts/header.php';
         <section class="col-5 card">
             <div class="card-head">
                 <div class="card-title-wrap">
-                    <span class="eyebrow">Proporsi Persentase</span>
                     <h3 class="card-title">Rasio Suara Masuk BEM</h3>
                 </div>
             </div>

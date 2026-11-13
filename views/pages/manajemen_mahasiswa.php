@@ -23,13 +23,9 @@ require BASE_PATH . '/views/layouts/header.php';
 ?>
 
 <section class="hero">
-    <div class="hero-text">
-        <span class="eyebrow">Master Data · Fitur 4</span>
-        <h1 class="hero-title">Hierarki Kelas & Daftar Pemilih Tetap (DPT)</h1>
-    </div>
     <div class="hero-actions">
         <?php if ($selectedKelasId > 0): ?>
-            <a href="<?= e(route_url('manajemen_mahasiswa')) ?>" class="btn btn--ghost btn--sm">Semua Kelas</a>
+            <a href="<?= e(route_url('manajemen_mahasiswa')) ?>" class="btn btn--ghost btn--sm" data-ajax-nav>Semua Kelas</a>
         <?php endif; ?>
         <button type="button" class="btn btn--ghost btn--sm" onclick="openCreateKelasModal()">+ Tambah Kelas</button>
         <button type="button" class="btn btn--primary btn--sm" onclick="openAddMahasiswaModal(<?= (int)$selectedKelasId ?>)">+ Tambah / Import DPT</button>
@@ -74,10 +70,9 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <div class="grid">
     <!-- Hierarki Kelas (Sesuai app.md Poin 5.4: Kelola Kelas -> Masuk Detail Kelas) -->
-    <section class="col-12 card">
+    <section class="col-12 card" id="kelasMasterCard">
         <div class="card-head">
             <div class="card-title-wrap">
-                <span class="eyebrow">Hierarki Kelas · Jurusan & Semester</span>
                 <h3 class="card-title">Daftar Kelas (Klik Kelas untuk Filter Mahasiswa)</h3>
             </div>
             <span class="badge primary"><?= count($kelasList) ?> Kelas</span>
@@ -104,7 +99,7 @@ require BASE_PATH . '/views/layouts/header.php';
                             <?php $isSelected = ($selectedKelasId === (int)$kl['id']); ?>
                             <tr class="data-row <?= $isSelected ? 'is-selected' : '' ?>">
                                 <td>
-                                    <a href="<?= e(route_url('manajemen_mahasiswa', ['kelas_id' => (int)$kl['id']])) ?>" class="badge primary">
+                                    <a href="<?= e(route_url('manajemen_mahasiswa', ['kelas_id' => (int)$kl['id']])) ?>" class="badge primary" data-ajax-nav>
                                         <?= e($kl['nama_kelas']) ?>
                                     </a>
                                 </td>
@@ -118,7 +113,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 </td>
                                 <td>
                                     <div class="data-cell-actions">
-                                        <a href="<?= e(route_url('manajemen_mahasiswa', ['kelas_id' => (int)$kl['id']])) ?>" class="btn btn--soft-primary btn--xs">Buka Kelas</a>
+                                        <a href="<?= e(route_url('manajemen_mahasiswa', ['kelas_id' => (int)$kl['id']])) ?>" class="btn btn--soft-primary btn--xs" data-ajax-nav>Buka Kelas</a>
                                         <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" style="display:inline;">
                                             <?= csrf_field() ?>
                                             <input type="hidden" name="sub_action" value="set_all_hadir_kelas">
@@ -127,7 +122,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                             <button type="submit" class="btn btn--ghost btn--xs" title="Aktifkan Check-In seluruh mahasiswa kelas ini">Check-In Semua</button>
                                         </form>
                                         <button type="button" class="btn btn--ghost btn--xs" onclick='openEditKelasModal(<?= json_encode($kl, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>Edit</button>
-                                        <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" onsubmit="return confirm('Hapus kelas ini beserta seluruh mahasiswa di dalamnya?');">
+                                        <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" data-confirm="Hapus kelas ini beserta seluruh mahasiswa di dalamnya?">
                                             <?= csrf_field() ?>
                                             <input type="hidden" name="sub_action" value="delete_kelas">
                                             <input type="hidden" name="id" value="<?= (int)$kl['id'] ?>">
@@ -147,7 +142,6 @@ require BASE_PATH . '/views/layouts/header.php';
     <section class="col-12 card" data-datatable-card>
         <div class="card-head">
             <div class="card-title-wrap">
-                <span class="eyebrow">Daftar Pemilih Tetap</span>
                 <h3 class="card-title">
                     <?php if ($selectedKelasInfo): ?>
                         Mahasiswa Kelas <?= e($selectedKelasInfo['nama_kelas']) ?> (<?= e($selectedKelasInfo['jurusan']) ?> · Semester <?= (int)$selectedKelasInfo['semester'] ?>)
@@ -244,7 +238,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 <td>
                                     <div class="data-cell-actions">
                                         <button type="button" class="btn btn--ghost btn--xs" onclick='openEditMahasiswaModal(<?= json_encode($m, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>Edit</button>
-                                        <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" onsubmit="return confirm('Hapus mahasiswa ini dari DPT?');">
+                                        <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" data-confirm="Hapus mahasiswa ini dari DPT?">
                                             <?= csrf_field() ?>
                                             <input type="hidden" name="sub_action" value="delete_mahasiswa">
                                             <input type="hidden" name="id" value="<?= (int)$m['id'] ?>">

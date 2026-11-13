@@ -25,6 +25,7 @@ require BASE_PATH . '/views/layouts/header.php';
 <?php if ($isFullScreenLayout): ?>
 <header class="lc-standalone-topbar">
     <div class="d-flex align-center gap-2">
+        <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img-sm">
         <span class="fw-700">Sistem PEMIRA · Portal QR Bilik Suara</span>
     </div>
     <div class="d-flex align-center gap-2">
@@ -36,10 +37,6 @@ require BASE_PATH . '/views/layouts/header.php';
 <?php endif; ?>
 
 <section class="hero">
-    <div class="hero-text">
-        <span class="eyebrow">Dynamic Single-Use Token · Fitur 3</span>
-        <h1 class="hero-title">Portal QR Code Bilik Suara</h1>
-    </div>
     <div class="hero-actions">
         <select id="portalBoothSelect" class="select" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;" onchange="changeActiveBooth(this.value)">
             <?php foreach ($bilikList as $b): ?>
@@ -113,7 +110,6 @@ require BASE_PATH . '/views/layouts/header.php';
     <div class="card">
         <div class="card-head">
             <div class="card-title-wrap">
-                <span class="eyebrow">Multi-Booth Monitor</span>
                 <h3 class="card-title">Status Terminal Bilik Suara</h3>
             </div>
             <span class="badge info">Real-Time</span>
@@ -130,10 +126,10 @@ require BASE_PATH . '/views/layouts/header.php';
                         <th class="text-right">Pilih Layar</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="portalQrAllBiliksTbody">
                     <?php foreach ($bilikList as $b): ?>
                         <?php $st = $b['status_bilik']; ?>
-                        <tr class="data-row <?= (int)$b['nomor_bilik'] === $selectedBooth ? 'is-selected' : '' ?>">
+                        <tr class="data-row <?= (int)$b['nomor_bilik'] === $selectedBooth ? 'is-selected' : '' ?>" data-booth-num="<?= (int)$b['nomor_bilik'] ?>">
                             <td><span class="data-cell-mono fw-600">#0<?= (int)$b['nomor_bilik'] ?></span></td>
                             <td>
                                 <div class="fw-600"><?= e($b['nama_bilik']) ?></div>
@@ -150,7 +146,7 @@ require BASE_PATH . '/views/layouts/header.php';
                             </td>
                             <td><span class="data-cell-mono fw-600"><?= number_format((int)$b['total_suara_bilik']) ?></span></td>
                             <td class="text-right">
-                                <a href="<?= e(route_url('portal_qr', ['booth' => (int)$b['nomor_bilik']])) ?>" class="btn btn--ghost btn--xs">Tampilkan QR</a>
+                                <button type="button" class="btn btn--ghost btn--xs" onclick="changeActiveBooth(<?= (int)$b['nomor_bilik'] ?>)">Tampilkan QR</button>
                             </td>
                         </tr>
                     <?php endforeach; ?>

@@ -17,14 +17,10 @@ require BASE_PATH . '/views/layouts/header.php';
 ?>
 
 <section class="hero">
-    <div class="hero-text">
-        <span class="eyebrow">Audit Trail · Fitur 5</span>
-        <h1 class="hero-title">Log Keamanan & Deteksi Fraud</h1>
-    </div>
     <div class="hero-actions">
-        <button type="button" class="btn btn--ghost btn--sm" id="btnToggleLiveLog" data-live="0">Auto-Refresh: OFF</button>
+        <button type="button" class="btn btn--soft-primary btn--sm" id="btnToggleLiveLog" data-live="1">Live Sync: ON (2s)</button>
         <a href="<?= e(action_url('log', ['sub_action' => 'export_csv'])) ?>" class="btn btn--soft-primary btn--sm">Export CSV</a>
-        <a href="<?= e(route_url('log_keamanan')) ?>" class="btn btn--ghost btn--sm">Refresh</a>
+        <button type="button" class="btn btn--ghost btn--sm" onclick="PemiraApp.syncCurrentPage()">Sinkronkan Sekarang</button>
     </div>
 </section>
 
@@ -56,6 +52,7 @@ require BASE_PATH . '/views/layouts/header.php';
     </div>
 </div>
 
+<div id="fraudBreakdownWrapper">
 <?php if (!empty($logStats['fraud_breakdown'])): ?>
 <div class="grid" style="margin-bottom: 16px;">
     <section class="col-12 card" style="padding: 12px 18px;">
@@ -76,6 +73,7 @@ require BASE_PATH . '/views/layouts/header.php';
     </section>
 </div>
 <?php endif; ?>
+</div>
 
 <!-- Adminator 2026 Data Table -->
 <div class="grid">
@@ -168,34 +166,31 @@ require BASE_PATH . '/views/layouts/header.php';
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('logSearchInput');
-    document.querySelectorAll('[data-fraud-quick]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (!searchInput) return;
-            const code = btn.getAttribute('data-fraud-quick') || '';
-            searchInput.value = searchInput.value === code ? '' : code;
-            searchInput.dispatchEvent(new Event('input'));
-        });
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('[data-fraud-quick]');
+        if (!btn || !searchInput) return;
+        const code = btn.getAttribute('data-fraud-quick') || '';
+        searchInput.value = searchInput.value === code ? '' : code;
+        searchInput.dispatchEvent(new Event('input'));
     });
 
     const btnLive = document.getElementById('btnToggleLiveLog');
-    let liveTimer = null;
     if (btnLive) {
         btnLive.addEventListener('click', () => {
             const isLive = btnLive.getAttribute('data-live') === '1';
             if (isLive) {
                 btnLive.setAttribute('data-live', '0');
-                btnLive.textContent = 'Auto-Refresh: OFF';
+                btnLive.textContent = 'Live Sync: OFF';
                 btnLive.classList.remove('btn--soft-primary');
                 btnLive.classList.add('btn--ghost');
-                if (liveTimer) clearInterval(liveTimer);
+                window.PEMIRA_LIVE_SYNC_PAUSED = true;
             } else {
                 btnLive.setAttribute('data-live', '1');
-                btnLive.textContent = 'Auto-Refresh: ON (5s)';
+                btnLive.textContent = 'Live Sync: ON (2s)';
                 btnLive.classList.remove('btn--ghost');
                 btnLive.classList.add('btn--soft-primary');
-                liveTimer = setInterval(() => {
-                    window.location.reload();
-                }, 5000);
+                window.PEMIRA_LIVE_SYNC_PAUSED = false;
+                if (typeof PemiraApp.syncCurrentPage === 'function') PemiraApp.syncCurrentPage();
             }
         });
     }

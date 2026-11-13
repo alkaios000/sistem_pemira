@@ -73,9 +73,10 @@ require BASE_PATH . '/views/layouts/header.php';
      data-verified-kelas="<?= e($activeSession['verified_kelas'] ?? '') ?>"
      data-verified-jurusan="<?= e($activeSession['verified_jurusan'] ?? '') ?>">
 
-    <!-- Topbar Bilik (Tanpa Placeholder Logo) -->
+    <!-- Topbar Bilik -->
     <header class="voting-topbar">
         <div class="d-flex align-center gap-2">
+            <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img-sm">
             <span class="fw-700" style="font-size:13.5px;">Sistem PEMIRA · Bilik Pemilihan Suara</span>
         </div>
 
@@ -112,7 +113,6 @@ require BASE_PATH . '/views/layouts/header.php';
         <div id="panelStep1" class="card scanner-card">
             <div class="card-head">
                 <div class="card-title-wrap">
-                    <span class="eyebrow">Tahap 01 · Otentikasi Bilik</span>
                     <h3 class="card-title">Pindai QR Code Bilik Suara</h3>
                 </div>
                 <span class="badge primary dot">One-Time QR</span>
@@ -150,7 +150,6 @@ require BASE_PATH . '/views/layouts/header.php';
         <div id="panelStep2" class="card scanner-card" style="display:none;">
             <div class="card-head">
                 <div class="card-title-wrap">
-                    <span class="eyebrow">Tahap 02 · Validasi DPT</span>
                     <h3 class="card-title">Masukkan NIM Anda</h3>
                 </div>
                 <span class="badge success dot" id="lockedBoothLabel">Bilik Terkunci</span>
@@ -171,7 +170,6 @@ require BASE_PATH . '/views/layouts/header.php';
             <div class="card mb-3" style="padding:12px 16px;background:var(--primary-soft);border-color:rgba(37,99,235,0.2);">
                 <div class="d-flex justify-between align-center flex-wrap gap-2">
                     <div>
-                        <span class="eyebrow">Pemilih Terverifikasi</span>
                         <div class="fw-700" style="font-size:14px;" id="voterInfoName">-</div>
                         <div class="mono text-muted" id="voterInfoSub">-</div>
                     </div>
@@ -183,10 +181,9 @@ require BASE_PATH . '/views/layouts/header.php';
             <div class="mb-4">
                 <div class="d-flex justify-between align-center mb-2">
                     <div>
-                        <span class="eyebrow">Surat Suara 01 · Eksekutif</span>
-                        <h2 class="hero-title" style="font-size:17px;">Calon Presiden & Wakil Presiden BEM</h2>
+                        <h2 class="hero-title" style="font-size:17px;">Calon Presiden BEM</h2>
                     </div>
-                    <span class="badge primary">Pilih 1 Paslon</span>
+                    <span class="badge primary">Pilih 1 Calon</span>
                 </div>
 
                 <div class="ballot-grid">
@@ -194,13 +191,13 @@ require BASE_PATH . '/views/layouts/header.php';
                         <?php $fotoUrl = !empty($kb['foto_path']) ? upload_url($kb['foto_path']) : asset_url('img/default_candidate.svg'); ?>
                         <div class="ballot-card"
                              data-bem-id="<?= (int)$kb['id'] ?>"
-                             data-bem-label="Paslon #0<?= (int)$kb['nomor_urut'] ?> · <?= e($kb['nama_calon']) ?><?= !empty($kb['nama_wakil']) ? ' & ' . e($kb['nama_wakil']) : '' ?>"
+                             data-bem-label="Calon #0<?= (int)$kb['nomor_urut'] ?> · <?= e($kb['nama_calon']) ?>"
                              onclick="selectBallotCard('BEM', <?= (int)$kb['id'] ?>, this)">
                             <div class="ballot-head">
                                 <div class="ballot-num">0<?= (int)$kb['nomor_urut'] ?></div>
-                                <img src="<?= e($fotoUrl) ?>" alt="Paslon" class="ballot-photo">
+                                <img src="<?= e($fotoUrl) ?>" alt="Calon" class="ballot-photo">
                                 <div>
-                                    <div class="ballot-names"><?= e($kb['nama_calon']) ?><?= !empty($kb['nama_wakil']) ? ' & ' . e($kb['nama_wakil']) : '' ?></div>
+                                    <div class="ballot-names"><?= e($kb['nama_calon']) ?></div>
                                     <div class="ballot-sub"><?= e($kb['jurusan_kelas'] ?? '-') ?></div>
                                 </div>
                             </div>
@@ -220,7 +217,6 @@ require BASE_PATH . '/views/layouts/header.php';
             <div class="mb-4">
                 <div class="d-flex justify-between align-center mb-2">
                     <div>
-                        <span class="eyebrow" style="color:var(--purple);">Surat Suara 02 · Legislatif</span>
                         <h2 class="hero-title" style="font-size:17px;">Calon Ketua Umum BPM</h2>
                     </div>
                     <span class="badge purple">Pilih 1 Calon</span>

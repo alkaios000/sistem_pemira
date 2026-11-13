@@ -141,6 +141,9 @@ function submitClaimQr() {
     })
         .then(res => res.json())
         .then(res => {
+            if (window.PemiraApp && typeof window.PemiraApp.broadcastSync === 'function') {
+                window.PemiraApp.broadcastSync('claim_qr');
+            }
             if (!res.success) {
                 PemiraApp.toast(res.message || 'Gagal mengklaim QR Code bilik.', 'danger');
                 return;
@@ -182,6 +185,9 @@ function submitVerifyNim() {
     })
         .then(res => res.json())
         .then(res => {
+            if (window.PemiraApp && typeof window.PemiraApp.broadcastSync === 'function') {
+                window.PemiraApp.broadcastSync('verify_nim');
+            }
             if (!res.success) {
                 PemiraApp.toast(res.message || 'Verifikasi NIM gagal.', 'danger');
                 if (res.data && res.data.session_dead) {
@@ -266,6 +272,9 @@ function submitConfirmVote() {
     })
         .then(res => res.json())
         .then(res => {
+            if (window.PemiraApp && typeof window.PemiraApp.broadcastSync === 'function') {
+                window.PemiraApp.broadcastSync('confirm_vote');
+            }
             if (!res.success) {
                 PemiraApp.toast(res.message || 'Gagal menyimpan suara.', 'danger');
                 if (btn) {

@@ -44,6 +44,8 @@ if ($sub_action === 'poll_portal_qr') {
         'token' => $bilik['current_token'],
     ]);
 
+    $all_biliks = get_all_biliks($pdo);
+
     json_response(true, 'Status bilik diperbarui.', [
         'bilik_id'               => (int) $bilik['id'],
         'nomor_bilik'            => (int) $bilik['nomor_bilik'],
@@ -61,6 +63,7 @@ if ($sub_action === 'poll_portal_qr') {
             : null,
         'total_suara_bilik'      => (int) $bilik['total_suara_bilik'],
         'last_vote_at'           => $bilik['last_vote_at'],
+        'all_biliks'             => $all_biliks,
     ]);
 }
 

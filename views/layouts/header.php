@@ -15,20 +15,29 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <title><?= e($pageTitle) ?> · <?= e($appName) ?></title>
 
+    <!-- App Icons & Favicon (Circular Transparent PNG) -->
+    <link rel="icon" type="image/png" sizes="72x72" href="<?= e(asset_url('img/icons/icon-72.png')) ?>?v=2">
+    <link rel="icon" type="image/png" sizes="96x96" href="<?= e(asset_url('img/icons/icon-96.png')) ?>?v=2">
+    <link rel="icon" type="image/png" sizes="128x128" href="<?= e(asset_url('img/icons/icon-128.png')) ?>?v=2">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?= e(asset_url('img/icons/icon-192.png')) ?>?v=2">
+    <link rel="apple-touch-icon" sizes="144x144" href="<?= e(asset_url('img/icons/icon-144.png')) ?>?v=2">
+    <link rel="apple-touch-icon" sizes="192x192" href="<?= e(asset_url('img/icons/icon-192.png')) ?>?v=2">
+    <link rel="apple-touch-icon" sizes="512x512" href="<?= e(asset_url('img/icons/icon-512.png')) ?>?v=2">
+
     <!-- Adminator 2026 Modular CSS -->
-    <link rel="stylesheet" href="<?= e(asset_url('css/base.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/layout.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/scrollbar.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/buttons.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/cards.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/forms.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/tables.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/modals.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/badges.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/dashboard.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/portal_qr.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/voting.css')) ?>">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/live_count.css')) ?>">
+    <link rel="stylesheet" href="<?= e(asset_url('css/base.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/layout.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/scrollbar.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/buttons.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/cards.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/forms.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/tables.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/modals.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/badges.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/dashboard.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/portal_qr.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/voting.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/live_count.css')) ?>?v=10">
 
     <script>
         window.PEMIRA_CONFIG = {
@@ -53,8 +62,11 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
                 <span class="current"><?= e($pageTitle) ?></span>
             </div>
             <div class="topbar-actions">
-                <span class="badge primary dot">2026/2027</span>
                 <?php if (is_authenticated()): ?>
+                    <div class="topbar-user">
+                        <span class="topbar-user-name"><?= e($_SESSION['nama_lengkap'] ?? 'Panitia PEMIRA') ?></span>
+                        <span class="badge primary"><?= e($_SESSION['user_role'] ?? 'ADMIN') ?></span>
+                    </div>
                     <a href="<?= e(route_url('logout')) ?>" class="btn btn--ghost btn--sm">Keluar</a>
                 <?php endif; ?>
             </div>
