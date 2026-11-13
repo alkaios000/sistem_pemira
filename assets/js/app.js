@@ -319,11 +319,16 @@ const PemiraApp = (() => {
                     curPanelBpm.innerHTML = newPanelBpm.innerHTML;
                 }
 
-                const activeTab = (typeof window.currentKandidatTab === 'string') ? window.currentKandidatTab : 'BEM';
+                const urlKat = (new URL(window.location.href).searchParams.get('kategori') || '').toUpperCase();
+                const activeTab = (typeof window.currentKandidatTab === 'string')
+                    ? window.currentKandidatTab
+                    : (urlKat === 'BPM' ? 'BPM' : 'BEM');
                 curPanelBem.style.display = (activeTab === 'BPM') ? 'none' : '';
                 curPanelBpm.style.display = (activeTab === 'BPM') ? '' : 'none';
                 if (curTabBem) curTabBem.classList.toggle('is-active', activeTab !== 'BPM');
                 if (curTabBpm) curTabBpm.classList.toggle('is-active', activeTab === 'BPM');
+                const btnAddKand = document.getElementById('btnAddKandidatActive');
+                if (btnAddKand) btnAddKand.textContent = '+ Tambah Kandidat ' + activeTab;
 
                 // If Detail modal is currently open, refresh its data live
                 const detailModal = document.getElementById('detailKandidatModal');
@@ -369,11 +374,24 @@ const PemiraApp = (() => {
                 curFraudWrap.innerHTML = newFraudWrap.innerHTML;
             }
 
-            // 5. Sync Master Kelas Table & Modal Selects on Manajemen Mahasiswa
-            const curKelasCard = document.getElementById('kelasMasterCard');
-            const newKelasCard = doc.getElementById('kelasMasterCard');
-            if (curKelasCard && newKelasCard && curKelasCard.innerHTML !== newKelasCard.innerHTML) {
-                curKelasCard.innerHTML = newKelasCard.innerHTML;
+            // 5. Sync Master Kelas Cards, JSON Payload, Detail Kelas Modal & Selects on Manajemen Mahasiswa
+            const curKelasPayload = document.getElementById('kelasDataPayload');
+            const newKelasPayload = doc.getElementById('kelasDataPayload');
+            if (curKelasPayload && newKelasPayload && curKelasPayload.textContent !== newKelasPayload.textContent) {
+                curKelasPayload.textContent = newKelasPayload.textContent;
+            }
+            const curKelasGrid = document.getElementById('kelasCardsGrid');
+            const newKelasGrid = doc.getElementById('kelasCardsGrid');
+            if (curKelasGrid && newKelasGrid) {
+                if (curKelasGrid.innerHTML !== newKelasGrid.innerHTML) {
+                    curKelasGrid.innerHTML = newKelasGrid.innerHTML;
+                }
+                if (typeof window.applyKelasCardFilter === 'function') {
+                    window.applyKelasCardFilter();
+                }
+            }
+            if (typeof window.refreshOpenDetailKelasModal === 'function') {
+                window.refreshOpenDetailKelasModal();
             }
             const mhsModal = document.getElementById('mahasiswaModal');
             if (mhsModal && !mhsModal.classList.contains('is-open')) {
@@ -387,8 +405,40 @@ const PemiraApp = (() => {
                     }
                 });
             }
+            const kelasModal = document.getElementById('kelasModal');
+            if (kelasModal && !kelasModal.classList.contains('is-open')) {
+                const curJurSel = document.getElementById('kelas_jurusan_input');
+                const newJurSel = doc.getElementById('kelas_jurusan_input');
+                if (curJurSel && newJurSel && curJurSel.innerHTML !== newJurSel.innerHTML) {
+                    const prev = curJurSel.value;
+                    curJurSel.innerHTML = newJurSel.innerHTML;
+                    curJurSel.value = prev;
+                }
+            }
+            const kandModal = document.getElementById('kandidatModal');
+            if (kandModal && !kandModal.classList.contains('is-open')) {
+                const curKandJur = document.getElementById('kand_jurusan_id');
+                const newKandJur = doc.getElementById('kand_jurusan_id');
+                if (curKandJur && newKandJur && curKandJur.innerHTML !== newKandJur.innerHTML) {
+                    const prev = curKandJur.value;
+                    curKandJur.innerHTML = newKandJur.innerHTML;
+                    curKandJur.value = prev;
+                }
+            }
 
-            // 6. Sync DataTable Cards (preserving search, filter, sort, and pagination)
+            // 6. Sync Bilik Cards Grid (preserving active search and status filter)
+            const curBilikGrid = document.getElementById('bilikCardsGrid');
+            const newBilikGrid = doc.getElementById('bilikCardsGrid');
+            if (curBilikGrid && newBilikGrid) {
+                if (curBilikGrid.innerHTML !== newBilikGrid.innerHTML) {
+                    curBilikGrid.innerHTML = newBilikGrid.innerHTML;
+                }
+                if (typeof window.applyBilikCardFilter === 'function') {
+                    window.applyBilikCardFilter();
+                }
+            }
+
+            // 7. Sync DataTable Cards (preserving search, filter, sort, and pagination)
             const curDtCards = Array.from(document.querySelectorAll('[data-datatable-card]'));
             const newDtCards = Array.from(doc.querySelectorAll('[data-datatable-card]'));
             if (curDtCards.length > 0 && curDtCards.length === newDtCards.length) {
@@ -399,8 +449,8 @@ const PemiraApp = (() => {
                 });
             }
 
-            // 7. Sync Dashboard Grid (when page has no DataTable cards and no Kandidat panels)
-            if (curDtCards.length === 0 && !curPanelBem && !document.getElementById('liveCountContainer') && !document.getElementById('portalQrRoot')) {
+            // 8. Sync Dashboard Grid (when page has no DataTable cards and no Kandidat/Bilik/Kelas panels)
+            if (curDtCards.length === 0 && !curPanelBem && !curBilikGrid && !curKelasGrid && !document.getElementById('liveCountContainer') && !document.getElementById('portalQrRoot')) {
                 const curGrid = document.querySelector('main.content > .grid');
                 const newGrid = doc.querySelector('main.content > .grid');
                 if (curGrid && newGrid && curGrid.innerHTML !== newGrid.innerHTML) {
@@ -442,7 +492,7 @@ const PemiraApp = (() => {
 
             if (json.success) {
                 // Close any open form modals
-                ['kandidatModal', 'mahasiswaModal', 'kelasModal', 'bilikModal'].forEach(mId => closeModal(mId));
+                ['kandidatModal', 'mahasiswaModal', 'kelasModal', 'bilikModal', 'jurusanModal'].forEach(mId => closeModal(mId));
 
                 // Reset import preview box if import form was submitted
                 if (form.id === 'confirmImportForm') {
@@ -526,7 +576,7 @@ const PemiraApp = (() => {
             const form = e.target;
             if (!form || form.tagName !== 'FORM') return;
             const actionAttr = form.getAttribute('action') || '';
-            if (!/action=(kandidat|mahasiswa|bilik)\b/i.test(actionAttr)) return;
+            if (!/action=(kandidat|mahasiswa|bilik|jurusan)\b/i.test(actionAttr)) return;
 
             e.preventDefault();
             const confirmMsg = form.getAttribute('data-confirm');

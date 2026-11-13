@@ -9,6 +9,7 @@ $pdo = get_db_connection();
 $pageTitle = 'Kandidat & Timses';
 $kandidatBem = get_kandidats_by_kategori($pdo, 'BEM');
 $kandidatBpm = get_kandidats_by_kategori($pdo, 'BPM');
+$jurusanList = get_all_jurusans($pdo);
 $activeKategori = (strtoupper((string)($_GET['kategori'] ?? 'BEM')) === 'BPM') ? 'BPM' : 'BEM';
 
 require BASE_PATH . '/views/layouts/header.php';
@@ -24,7 +25,7 @@ require BASE_PATH . '/views/layouts/header.php';
         </button>
     </div>
     <div class="hero-actions">
-        <button type="button" class="btn btn--primary btn--sm" id="btnAddKandidatActive" onclick="openCreateKandidatModal(currentKandidatTab)">
+        <button type="button" class="btn btn--primary btn--sm" id="btnAddKandidatActive" onclick="openCreateKandidatModal(window.currentKandidatTab)">
             + Tambah Kandidat <?= e($activeKategori) ?>
         </button>
     </div>
@@ -45,24 +46,37 @@ require BASE_PATH . '/views/layouts/header.php';
                 <?php
                 $fotoUrl = !empty($k['foto_path']) ? upload_url($k['foto_path']) : asset_url('img/default_candidate.svg');
                 $kJson = json_encode($k, JSON_HEX_APOS | JSON_HEX_QUOT);
+                $tsCount = is_array($k['tim_sukses'] ?? null) ? count($k['tim_sukses']) : 0;
                 ?>
                 <div class="kandidat-card">
-                    <div class="kandidat-card-top">
+                    <div class="kandidat-card-bar">
+                        <span class="kandidat-num-pill">CALON #0<?= (int)$k['nomor_urut'] ?></span>
+                        <div class="kandidat-stat-pills">
+                            <span class="badge primary"><?= number_format((int)$k['jumlah_suara']) ?> Suara</span>
+                            <span class="badge neutral"><?= $tsCount ?> Timses</span>
+                        </div>
+                    </div>
+
+                    <div class="kandidat-card-top" onclick='openDetailKandidatModal(<?= $kJson ?>)' title="Klik untuk melihat detail Visi, Misi & Tim Sukses">
                         <img src="<?= e($fotoUrl) ?>" alt="Calon" class="kandidat-photo">
                         <div class="kandidat-meta">
-                            <div class="kandidat-urut">CALON #0<?= (int)$k['nomor_urut'] ?> · <?= number_format((int)$k['jumlah_suara']) ?> Suara</div>
                             <div class="kandidat-names"><?= e($k['nama_calon']) ?></div>
-                            <div class="kandidat-classes"><?= e($k['jurusan_kelas'] ?? '-') ?></div>
+                            <div class="kandidat-classes"><?= e($k['jurusan_kelas'] ?: 'Program Studi belum diisi') ?></div>
                         </div>
+                    </div>
+
+                    <div class="kandidat-card-foot">
+                        <button type="button" class="btn btn--soft-primary btn--xs" style="flex:1;" data-kand-id="<?= (int)$k['id'] ?>" data-kand-json='<?= $kJson ?>' onclick='openDetailKandidatModal(<?= $kJson ?>)'>
+                            Detail Visi & Timses
+                        </button>
                         <div class="data-cell-actions">
-                            <button type="button" class="btn btn--soft-primary btn--xs" data-kand-id="<?= (int)$k['id'] ?>" data-kand-json='<?= $kJson ?>' onclick='openDetailKandidatModal(<?= $kJson ?>)'>Detail</button>
                             <button type="button" class="btn btn--ghost btn--xs" onclick='openEditKandidatModal(<?= $kJson ?>)'>Edit</button>
                             <form action="<?= e(action_url('kandidat')) ?>" method="POST" data-confirm="Hapus kandidat ini beserta tim suksesnya?">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="sub_action" value="delete">
                                 <input type="hidden" name="id" value="<?= (int)$k['id'] ?>">
                                 <input type="hidden" name="kategori" value="BEM">
-                                <button type="submit" class="btn btn--soft-danger btn--xs">×</button>
+                                <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Kandidat">×</button>
                             </form>
                         </div>
                     </div>
@@ -85,24 +99,37 @@ require BASE_PATH . '/views/layouts/header.php';
                 <?php
                 $fotoUrl = !empty($k['foto_path']) ? upload_url($k['foto_path']) : asset_url('img/default_candidate.svg');
                 $kJson = json_encode($k, JSON_HEX_APOS | JSON_HEX_QUOT);
+                $tsCount = is_array($k['tim_sukses'] ?? null) ? count($k['tim_sukses']) : 0;
                 ?>
                 <div class="kandidat-card">
-                    <div class="kandidat-card-top">
+                    <div class="kandidat-card-bar">
+                        <span class="kandidat-num-pill is-bpm">CALON #0<?= (int)$k['nomor_urut'] ?></span>
+                        <div class="kandidat-stat-pills">
+                            <span class="badge purple"><?= number_format((int)$k['jumlah_suara']) ?> Suara</span>
+                            <span class="badge neutral"><?= $tsCount ?> Timses</span>
+                        </div>
+                    </div>
+
+                    <div class="kandidat-card-top" onclick='openDetailKandidatModal(<?= $kJson ?>)' title="Klik untuk melihat detail Visi, Misi & Tim Sukses">
                         <img src="<?= e($fotoUrl) ?>" alt="Calon" class="kandidat-photo">
                         <div class="kandidat-meta">
-                            <div class="kandidat-urut" style="color:var(--purple);">CALON #0<?= (int)$k['nomor_urut'] ?> · <?= number_format((int)$k['jumlah_suara']) ?> Suara</div>
                             <div class="kandidat-names"><?= e($k['nama_calon']) ?></div>
-                            <div class="kandidat-classes"><?= e($k['jurusan_kelas'] ?? '-') ?></div>
+                            <div class="kandidat-classes"><?= e($k['jurusan_kelas'] ?: 'Program Studi belum diisi') ?></div>
                         </div>
+                    </div>
+
+                    <div class="kandidat-card-foot">
+                        <button type="button" class="btn btn--soft-primary btn--xs" style="flex:1;" data-kand-id="<?= (int)$k['id'] ?>" data-kand-json='<?= $kJson ?>' onclick='openDetailKandidatModal(<?= $kJson ?>)'>
+                            Detail Visi & Timses
+                        </button>
                         <div class="data-cell-actions">
-                            <button type="button" class="btn btn--soft-primary btn--xs" data-kand-id="<?= (int)$k['id'] ?>" data-kand-json='<?= $kJson ?>' onclick='openDetailKandidatModal(<?= $kJson ?>)'>Detail</button>
                             <button type="button" class="btn btn--ghost btn--xs" onclick='openEditKandidatModal(<?= $kJson ?>)'>Edit</button>
                             <form action="<?= e(action_url('kandidat')) ?>" method="POST" data-confirm="Hapus kandidat ini beserta tim suksesnya?">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="sub_action" value="delete">
                                 <input type="hidden" name="id" value="<?= (int)$k['id'] ?>">
                                 <input type="hidden" name="kategori" value="BPM">
-                                <button type="submit" class="btn btn--soft-danger btn--xs">×</button>
+                                <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Kandidat">×</button>
                             </form>
                         </div>
                     </div>
@@ -228,9 +255,25 @@ require BASE_PATH . '/views/layouts/header.php';
                             <input type="text" name="nama_calon" id="kand_nama_calon" class="input" placeholder="Nama lengkap kandidat" required>
                         </div>
 
-                        <div class="field mb-0">
-                            <label class="field-label">Jurusan / Semester</label>
-                            <input type="text" name="jurusan_kelas" id="kand_jurusan_kelas" class="input" placeholder="Teknik Informatika - Smt 5" required>
+                        <div class="form-grid mb-0" style="grid-template-columns: 1.45fr 0.55fr;">
+                            <div class="field mb-0">
+                                <label class="field-label">
+                                    <span>Jurusan</span>
+                                    <a href="<?= e(route_url('manajemen_jurusan')) ?>" class="hint" style="color:var(--primary);text-decoration:none;">Kelola ↗</a>
+                                </label>
+                                <select name="jurusan_id" id="kand_jurusan_id" class="select" required>
+                                    <option value="">-- Pilih Jurusan --</option>
+                                    <?php foreach ($jurusanList as $jur): ?>
+                                        <option value="<?= (int)$jur['id'] ?>" data-nama="<?= e($jur['nama_jurusan']) ?>">
+                                            <?= e($jur['nama_jurusan']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="field mb-0">
+                                <label class="field-label">Smt</label>
+                                <input type="number" name="semester" id="kand_semester" class="input mono" min="1" max="14" placeholder="1-14">
+                            </div>
                         </div>
                     </div>
 
@@ -269,17 +312,18 @@ require BASE_PATH . '/views/layouts/header.php';
 </div>
 
 <script>
-let currentKandidatTab = '<?= e($activeKategori) ?>';
+window.currentKandidatTab = '<?= e($activeKategori) ?>';
 
 function switchKandidatTab(kategori) {
-    currentKandidatTab = (kategori === 'BPM') ? 'BPM' : 'BEM';
+    window.currentKandidatTab = (kategori === 'BPM') ? 'BPM' : 'BEM';
+    const activeTab = window.currentKandidatTab;
     const panelBEM = document.getElementById('panelKandidatBEM');
     const panelBPM = document.getElementById('panelKandidatBPM');
     const tabBEM = document.getElementById('tabBtnBEM');
     const tabBPM = document.getElementById('tabBtnBPM');
     const btnAdd = document.getElementById('btnAddKandidatActive');
 
-    if (currentKandidatTab === 'BPM') {
+    if (activeTab === 'BPM') {
         if (panelBEM) panelBEM.style.display = 'none';
         if (panelBPM) panelBPM.style.display = '';
         if (tabBEM) tabBEM.classList.remove('is-active');
@@ -292,13 +336,14 @@ function switchKandidatTab(kategori) {
     }
 
     if (btnAdd) {
-        btnAdd.textContent = '+ Tambah Kandidat ' + currentKandidatTab;
+        btnAdd.textContent = '+ Tambah Kandidat ' + activeTab;
     }
 
     const url = new URL(window.location.href);
-    url.searchParams.set('kategori', currentKandidatTab);
+    url.searchParams.set('kategori', activeTab);
     window.history.replaceState({}, '', url.toString());
 }
+window.switchKandidatTab = switchKandidatTab;
 
 function addTimsesRow(nama = '', nim = '', jabatan = 'Koordinator Kampanye') {
     const container = document.getElementById('timsesRowsContainer');
@@ -432,7 +477,8 @@ function openCreateKandidatModal(kategori = 'BEM') {
     document.getElementById('kand_kategori').value = kategori;
     document.getElementById('kand_urut').value = 1;
     document.getElementById('kand_nama_calon').value = '';
-    document.getElementById('kand_jurusan_kelas').value = '';
+    document.getElementById('kand_jurusan_id').value = '';
+    document.getElementById('kand_semester').value = '';
     document.getElementById('kand_visi').value = '';
     document.getElementById('kand_misi').value = '';
     resetFotoPreview('', 'JPG/PNG/WEBP · Maks 2MB');
@@ -448,7 +494,22 @@ function openEditKandidatModal(k) {
     document.getElementById('kand_kategori').value = k.kategori;
     document.getElementById('kand_urut').value = k.nomor_urut;
     document.getElementById('kand_nama_calon').value = k.nama_calon || '';
-    document.getElementById('kand_jurusan_kelas').value = k.jurusan_kelas || '';
+    const jurSel = document.getElementById('kand_jurusan_id');
+    const rawJurusanKelas = String(k.jurusan_kelas || '').trim();
+    const smtMatch = rawJurusanKelas.match(/Smt\s*(\d+)/i);
+    document.getElementById('kand_semester').value = smtMatch ? smtMatch[1] : '';
+    if (jurSel) {
+        if (k.jurusan_id && jurSel.querySelector(`option[value="${k.jurusan_id}"]`)) {
+            jurSel.value = String(k.jurusan_id);
+        } else {
+            const baseJur = rawJurusanKelas.replace(/\s*[·\-]\s*Smt\s*\d+/i, '').trim().toLowerCase();
+            const matchedOpt = Array.from(jurSel.options).find(o => {
+                const optNama = (o.getAttribute('data-nama') || '').toLowerCase();
+                return optNama && (baseJur === optNama || baseJur.startsWith(optNama));
+            });
+            jurSel.value = matchedOpt ? matchedOpt.value : '';
+        }
+    }
     document.getElementById('kand_visi').value = k.visi || '';
     document.getElementById('kand_misi').value = k.misi || '';
     const existingFoto = k.foto_path ? `${window.PEMIRA_CONFIG.baseUrl}/uploads/${k.foto_path}` : '';

@@ -4,6 +4,7 @@
  */
 
 require_once BASE_PATH . '/models/mahasiswa_model.php';
+require_once BASE_PATH . '/models/jurusan_model.php';
 
 $pdo = get_db_connection();
 $sub_action = $_POST['sub_action'] ?? $_GET['sub_action'] ?? '';
@@ -82,18 +83,23 @@ verify_csrf_request();
 $kelas_id_redirect = (int) ($_POST['kelas_id'] ?? $_GET['kelas_id'] ?? 0);
 
 try {
-    // 1. CRUD Kelas (Nama Kelas, Jurusan, Semester)
+    // 1. CRUD Kelas (Nama Kelas, Jurusan Terhubung Master, Semester)
     if ($sub_action === 'create_kelas') {
         $nama_kelas = trim((string) ($_POST['nama_kelas'] ?? ''));
-        $jurusan = trim((string) ($_POST['jurusan'] ?? ''));
+        $jurusan_id = (int) ($_POST['jurusan_id'] ?? 0);
+        $jurusan_raw = trim((string) ($_POST['jurusan'] ?? ''));
         $semester = (int) ($_POST['semester'] ?? 1);
+
+        $jurRow = $jurusan_id > 0 ? find_jurusan_by_id($pdo, $jurusan_id) : find_jurusan_by_nama($pdo, $jurusan_raw);
+        $jurusan = $jurRow ? $jurRow['nama_jurusan'] : $jurusan_raw;
+        $resolved_jurusan_id = $jurRow ? (int) $jurRow['id'] : null;
 
         if ($nama_kelas === '' || $jurusan === '' || $semester < 1 || $semester > 14) {
             set_flash('danger', 'Nama kelas, jurusan, dan semester (1-14) wajib diisi dengan benar.');
             redirect(route_url('manajemen_mahasiswa'));
         }
 
-        $new_kelas_id = create_kelas($pdo, $nama_kelas, $jurusan, $semester);
+        $new_kelas_id = create_kelas($pdo, $nama_kelas, $jurusan, $semester, $resolved_jurusan_id);
         set_flash('success', "Kelas {$nama_kelas} ({$jurusan} - Semester {$semester}) berhasil dibuat. Silakan tambahkan atau impor data mahasiswa.");
         redirect(route_url('manajemen_mahasiswa', ['kelas_id' => $new_kelas_id]));
     }
@@ -101,15 +107,20 @@ try {
     if ($sub_action === 'update_kelas') {
         $id = (int) ($_POST['id'] ?? 0);
         $nama_kelas = trim((string) ($_POST['nama_kelas'] ?? ''));
-        $jurusan = trim((string) ($_POST['jurusan'] ?? ''));
+        $jurusan_id = (int) ($_POST['jurusan_id'] ?? 0);
+        $jurusan_raw = trim((string) ($_POST['jurusan'] ?? ''));
         $semester = (int) ($_POST['semester'] ?? 1);
+
+        $jurRow = $jurusan_id > 0 ? find_jurusan_by_id($pdo, $jurusan_id) : find_jurusan_by_nama($pdo, $jurusan_raw);
+        $jurusan = $jurRow ? $jurRow['nama_jurusan'] : $jurusan_raw;
+        $resolved_jurusan_id = $jurRow ? (int) $jurRow['id'] : null;
 
         if ($id < 1 || $nama_kelas === '' || $jurusan === '') {
             set_flash('danger', 'Data pembaruan kelas tidak lengkap.');
             redirect(route_url('manajemen_mahasiswa'));
         }
 
-        update_kelas($pdo, $id, $nama_kelas, $jurusan, $semester);
+        update_kelas($pdo, $id, $nama_kelas, $jurusan, $semester, $resolved_jurusan_id);
         set_flash('success', "Data kelas {$nama_kelas} berhasil diperbarui.");
         redirect(route_url('manajemen_mahasiswa', ['kelas_id' => $id]));
     }

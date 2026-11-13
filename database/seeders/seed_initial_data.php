@@ -7,6 +7,9 @@
 
 function run_initial_seeder(PDO $pdo): void
 {
+    require_once BASE_PATH . '/models/jurusan_model.php';
+    ensure_jurusans_ready($pdo);
+
     // 1. Seed Pengguna Admin & Panitia
     $stmt_check_user = $pdo->query('SELECT COUNT(*) FROM users');
     if ((int) $stmt_check_user->fetchColumn() === 0) {
@@ -91,12 +94,36 @@ function run_initial_seeder(PDO $pdo): void
         }
     }
 
-    // 4. Seed Kelas & Mahasiswa (DPT Contoh)
+    // 4. Seed Master Jurusan, Kelas & Mahasiswa (DPT Contoh)
+    $stmt_check_jurusan = $pdo->query('SELECT COUNT(*) FROM jurusans');
+    if ((int) $stmt_check_jurusan->fetchColumn() === 0) {
+        $stmt_jur = $pdo->prepare('
+            INSERT INTO jurusans (kode_jurusan, nama_jurusan, jenjang)
+            VALUES (:kode, :nama, :jenjang)
+        ');
+        foreach ([
+            ['kode' => 'TI', 'nama' => 'Teknik Informatika', 'jenjang' => 'S1'],
+            ['kode' => 'SI', 'nama' => 'Sistem Informasi', 'jenjang' => 'S1'],
+            ['kode' => 'MI', 'nama' => 'Manajemen Informatika', 'jenjang' => 'D3'],
+        ] as $j) {
+            $stmt_jur->execute([
+                ':kode'    => $j['kode'],
+                ':nama'    => $j['nama'],
+                ':jenjang' => $j['jenjang'],
+            ]);
+        }
+    }
+
+    $jurMap = [];
+    foreach ($pdo->query('SELECT id, nama_jurusan FROM jurusans')->fetchAll() as $jr) {
+        $jurMap[$jr['nama_jurusan']] = (int) $jr['id'];
+    }
+
     $stmt_check_kelas = $pdo->query('SELECT COUNT(*) FROM kelas');
     if ((int) $stmt_check_kelas->fetchColumn() === 0) {
         $stmt_kelas = $pdo->prepare('
-            INSERT INTO kelas (nama_kelas, jurusan, semester)
-            VALUES (:nama_kelas, :jurusan, :semester)
+            INSERT INTO kelas (jurusan_id, nama_kelas, jurusan, semester)
+            VALUES (:jurusan_id, :nama_kelas, :jurusan, :semester)
         ');
 
         $daftar_kelas = [
@@ -109,6 +136,7 @@ function run_initial_seeder(PDO $pdo): void
         $kelas_ids = [];
         foreach ($daftar_kelas as $k) {
             $stmt_kelas->execute([
+                ':jurusan_id' => $jurMap[$k['jurusan']] ?? null,
                 ':nama_kelas' => $k['nama_kelas'],
                 ':jurusan'    => $k['jurusan'],
                 ':semester'   => $k['semester'],

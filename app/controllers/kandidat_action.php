@@ -4,6 +4,7 @@
  */
 
 require_once BASE_PATH . '/models/kandidat_model.php';
+require_once BASE_PATH . '/models/jurusan_model.php';
 
 require_auth();
 verify_csrf_request();
@@ -19,12 +20,27 @@ try {
         $nomor_urut = (int) ($_POST['nomor_urut'] ?? 1);
         $nama_calon = trim((string) ($_POST['nama_calon'] ?? ''));
         $nama_wakil = trim((string) ($_POST['nama_wakil'] ?? ''));
-        $jurusan_kelas = trim((string) ($_POST['jurusan_kelas'] ?? ''));
+        $jurusan_id = (int) ($_POST['jurusan_id'] ?? 0);
+        $semester = (int) ($_POST['semester'] ?? 0);
+        $jurusan_kelas_raw = trim((string) ($_POST['jurusan_kelas'] ?? ''));
+
+        $jurRow = $jurusan_id > 0 ? find_jurusan_by_id($pdo, $jurusan_id) : null;
+        if ($jurRow) {
+            $jurusan_id = (int) $jurRow['id'];
+            $jurusan_kelas = $semester > 0
+                ? ($jurRow['nama_jurusan'] . ' · Smt ' . $semester)
+                : $jurRow['nama_jurusan'];
+        } else {
+            $jurusan_kelas = $jurusan_kelas_raw;
+            $matchedJur = $jurusan_kelas !== '' ? find_jurusan_by_nama($pdo, $jurusan_kelas) : null;
+            $jurusan_id = $matchedJur ? (int) $matchedJur['id'] : 0;
+        }
+
         $visi = trim((string) ($_POST['visi'] ?? ''));
         $misi = trim((string) ($_POST['misi'] ?? ''));
 
-        if ($nama_calon === '' || $visi === '' || $misi === '' || $nomor_urut < 1) {
-            set_flash('danger', 'Nomor urut, Nama Calon Utama, Visi, dan Misi wajib diisi dengan lengkap.');
+        if ($nama_calon === '' || $jurusan_kelas === '' || $visi === '' || $misi === '' || $nomor_urut < 1) {
+            set_flash('danger', 'Nomor urut, Nama Calon Utama, Jurusan, Visi, dan Misi wajib diisi dengan lengkap.');
             redirect(route_url('manajemen_kandidat', ['kategori' => $kategori]));
         }
 
@@ -68,6 +84,7 @@ try {
 
         $payload = [
             'kategori'      => $kategori,
+            'jurusan_id'    => $jurusan_id > 0 ? $jurusan_id : null,
             'nomor_urut'    => $nomor_urut,
             'nama_calon'    => $nama_calon,
             'nama_wakil'    => $nama_wakil,

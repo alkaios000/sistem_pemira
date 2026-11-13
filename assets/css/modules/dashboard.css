@@ -5,7 +5,7 @@
 /* Candidate Compact Grid & Cards (Feature 1) */
 .kandidat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
     gap: 14px;
 }
 
@@ -14,22 +14,55 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     box-shadow: var(--shadow-card);
-    padding: 16px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
+.kandidat-card-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.kandidat-num-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--primary);
+    background: var(--primary-soft);
+    padding: 3px 9px;
+    border-radius: 6px;
+    letter-spacing: 0.04em;
+}
+
+.kandidat-num-pill.is-bpm {
+    color: var(--purple);
+    background: rgba(124, 58, 237, 0.1);
+}
+
+.kandidat-stat-pills {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .kandidat-card-top {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 13px;
+    cursor: pointer;
 }
 
 .kandidat-photo {
-    width: 52px;
-    height: 52px;
-    border-radius: 10px;
+    width: 54px;
+    height: 54px;
+    border-radius: 11px;
     object-fit: cover;
     border: 1px solid var(--border);
     background: var(--bg-muted);
@@ -46,24 +79,38 @@
     font-size: 10px;
     font-weight: 600;
     color: var(--primary);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
 }
 
 .kandidat-names {
     font-family: var(--font-display);
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--t-base);
     line-height: 1.25;
-    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .kandidat-classes {
     font-family: var(--font-mono);
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--t-muted);
-    margin-top: 2px;
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kandidat-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
 }
 
 .kandidat-visi {
@@ -130,10 +177,10 @@
     padding: 0 2px;
 }
 
-/* Bilik Terminal Grid (Feature 2) */
+/* Bilik Terminal Grid & Cards (Feature 2) */
 .bilik-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
     gap: 14px;
 }
 
@@ -145,19 +192,104 @@
     padding: 15px 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
 }
 
 .bilik-card.status-used {
-    border-left: 3px solid var(--primary);
+    border-left: 3.5px solid var(--primary);
 }
 
 .bilik-card.status-idle {
-    border-left: 3px solid var(--success);
+    border-left: 3.5px solid var(--success);
 }
 
 .bilik-card.status-locked {
-    border-left: 3px solid var(--danger);
+    border-left: 3.5px solid var(--danger);
+}
+
+.bilik-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.bilik-card-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--t-base);
+    line-height: 1.25;
+    margin-top: 6px;
+}
+
+.bilik-card-loc {
+    font-size: 11.5px;
+    color: var(--t-muted);
+    margin-top: 2px;
+}
+
+.bilik-telemetry {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.bilik-telemetry-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.bilik-telemetry-divider {
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.bilik-meta-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--t-muted);
+    margin-bottom: 2px;
+}
+
+.bilik-meta-val {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--t-base);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bilik-meta-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--t-muted);
+    margin-top: 1px;
+}
+
+.bilik-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
+    margin-top: auto;
+    flex-wrap: wrap;
 }
 
 /* Progress Bar (Adminator 2026) */
@@ -297,9 +429,113 @@
     white-space: nowrap;
 }
 
+/* Kelas Minimal Card Grid (Feature 4) */
+.kelas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
+    gap: 14px;
+}
+
+.kelas-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    padding: 15px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.kelas-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.kelas-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.kelas-card-code {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--primary);
+    background: var(--primary-soft);
+    padding: 3px 9px;
+    border-radius: 6px;
+    letter-spacing: 0.03em;
+}
+
+.kelas-card-total {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--t-muted);
+}
+
+.kelas-card-info {
+    cursor: pointer;
+    min-width: 0;
+}
+
+.kelas-card-major {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--t-base);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kelas-card-sem {
+    font-size: 11.5px;
+    color: var(--t-muted);
+    margin-top: 2px;
+}
+
+.kelas-card-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.kelas-card-metrics {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--t-muted);
+}
+
+.kelas-card-metrics strong {
+    color: var(--t-base);
+    font-weight: 600;
+}
+
+.kelas-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
+    margin-top: auto;
+}
+
 @media (max-width: 640px) {
     .kandidat-grid,
     .bilik-grid,
+    .kelas-grid,
     .kand-modal-split {
         grid-template-columns: 1fr;
     }

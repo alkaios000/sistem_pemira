@@ -25,9 +25,23 @@ CREATE TABLE IF NOT EXISTS `pengaturan_sistem` (
     PRIMARY KEY (`kunci`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 02: Tabel Kelas dan Mahasiswa (DPT)
+-- 02: Tabel Master Jurusan, Kelas dan Mahasiswa (DPT)
+CREATE TABLE IF NOT EXISTS `jurusans` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `kode_jurusan` VARCHAR(20) NOT NULL,
+    `nama_jurusan` VARCHAR(120) NOT NULL,
+    `jenjang` VARCHAR(20) NOT NULL DEFAULT 'S1',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_jurusan_kode` (`kode_jurusan`),
+    UNIQUE KEY `uq_jurusan_nama` (`nama_jurusan`),
+    KEY `idx_jurusan_jenjang` (`jenjang`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `kelas` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `jurusan_id` INT UNSIGNED DEFAULT NULL,
     `nama_kelas` VARCHAR(100) NOT NULL,
     `jurusan` VARCHAR(120) NOT NULL,
     `semester` TINYINT UNSIGNED NOT NULL,
@@ -35,6 +49,7 @@ CREATE TABLE IF NOT EXISTS `kelas` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_kelas_kombinasi` (`nama_kelas`, `jurusan`, `semester`),
+    KEY `idx_kelas_jurusan_id` (`jurusan_id`),
     KEY `idx_kelas_jurusan` (`jurusan`),
     KEY `idx_kelas_semester` (`semester`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -60,6 +75,7 @@ CREATE TABLE IF NOT EXISTS `mahasiswas` (
 CREATE TABLE IF NOT EXISTS `kandidats` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `kategori` ENUM('BEM', 'BPM') NOT NULL,
+    `jurusan_id` INT UNSIGNED DEFAULT NULL,
     `nomor_urut` TINYINT UNSIGNED NOT NULL,
     `nama_calon` VARCHAR(150) NOT NULL,
     `nama_wakil` VARCHAR(150) DEFAULT NULL,
@@ -72,7 +88,8 @@ CREATE TABLE IF NOT EXISTS `kandidats` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_kandidat_kategori_urut` (`kategori`, `nomor_urut`),
-    KEY `idx_kandidat_kategori` (`kategori`)
+    KEY `idx_kandidat_kategori` (`kategori`),
+    KEY `idx_kandidat_jurusan_id` (`jurusan_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tim_sukses` (

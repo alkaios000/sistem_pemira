@@ -32,10 +32,18 @@ if ($sub_action === 'poll_portal_qr') {
     $force_rotate = isset($_GET['force']) && $_GET['force'] === '1';
 
     $global_portal = get_setting_value($pdo, 'status_portal_global', 'BUKA');
+    $wajib_checkin = get_setting_value($pdo, 'wajib_checkin_panitia', '0');
     $bilik = rotate_or_get_bilik_token($pdo, $nomor_bilik, $qr_ttl, $force_rotate);
 
     if (!$bilik) {
-        json_response(false, 'Nomor bilik suara tidak ditemukan.', [], 404);
+        $all_fallback = get_all_biliks($pdo);
+        if (!empty($all_fallback)) {
+            $nomor_bilik = (int) $all_fallback[0]['nomor_bilik'];
+            $bilik = rotate_or_get_bilik_token($pdo, $nomor_bilik, $qr_ttl, $force_rotate);
+        }
+        if (!$bilik) {
+            json_response(false, 'Nomor bilik suara tidak ditemukan.', [], 404);
+        }
     }
 
     $effective_status = ($global_portal !== 'BUKA') ? 'CLOSED' : $bilik['status_bilik'];
@@ -45,6 +53,13 @@ if ($sub_action === 'poll_portal_qr') {
     ]);
 
     $all_biliks = get_all_biliks($pdo);
+    $now_ts = time();
+    foreach ($all_biliks as &$b_item) {
+        $b_item['remaining_lock_seconds'] = ($b_item['status_bilik'] === 'IN_USE' && !empty($b_item['locked_until']))
+            ? max(0, strtotime($b_item['locked_until']) - $now_ts)
+            : 0;
+    }
+    unset($b_item);
 
     json_response(true, 'Status bilik diperbarui.', [
         'bilik_id'               => (int) $bilik['id'],
@@ -53,6 +68,7 @@ if ($sub_action === 'poll_portal_qr') {
         'lokasi_bilik'           => $bilik['lokasi_bilik'],
         'status_bilik'           => $effective_status,
         'global_portal'          => $global_portal,
+        'wajib_checkin'          => $wajib_checkin,
         'qr_token'               => $effective_status === 'IDLE' ? $bilik['current_token'] : null,
         'scan_url'               => $effective_status === 'IDLE' ? $scan_url : null,
         'qr_ttl_seconds'         => $qr_ttl,

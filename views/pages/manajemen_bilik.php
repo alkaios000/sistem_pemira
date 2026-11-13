@@ -91,18 +91,18 @@ require BASE_PATH . '/views/layouts/header.php';
     </div>
 </div>
 
-<!-- Adminator 2026 Data Table -->
+<!-- Filter & Grid Card Bilik Suara -->
 <div class="grid">
-    <section class="col-12 card" data-datatable-card>
-        <div class="data-toolbar">
+    <section class="col-12 card">
+        <div class="data-toolbar" style="padding: 0 0 14px 0; margin-bottom: 14px; border-bottom: 1px solid var(--border-soft);">
             <div class="data-toolbar-left">
                 <div class="input-icon" style="flex:1;max-width:300px;">
                     <span class="ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
-                    <input type="search" class="input" data-dt-search placeholder="Cari nomor bilik, nama, atau lokasi...">
+                    <input type="search" class="input" id="bilikSearchInput" placeholder="Cari nomor bilik, nama, atau lokasi...">
                 </div>
             </div>
             <div class="data-toolbar-right">
-                <select class="select" data-dt-filter="data-status" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
+                <select class="select" id="bilikStatusFilter" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
                     <option value="ALL">Semua Status</option>
                     <option value="IDLE">IDLE (Siap)</option>
                     <option value="IN_USE">IN_USE (Dipakai)</option>
@@ -111,108 +111,115 @@ require BASE_PATH . '/views/layouts/header.php';
             </div>
         </div>
 
-        <div class="data-table-wrap">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th data-sort>No. Bilik <span class="sort">▾</span></th>
-                        <th data-sort>Nama Bilik & Lokasi <span class="sort">▾</span></th>
-                        <th>Status Real-Time</th>
-                        <th>Token QR & Durasi Sesi</th>
-                        <th>NIM Sesi Aktif</th>
-                        <th data-sort>Suara Masuk <span class="sort">▾</span></th>
-                        <th>Fraud</th>
-                        <th class="text-right">Kontrol & Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($bilikList as $b): ?>
-                        <?php
-                        $st = $b['status_bilik'];
-                        $tokenShort = !empty($b['current_token']) ? strtoupper(substr((string) $b['current_token'], 0, 10)) . '...' : '-';
-                        $remainLock = 0;
-                        if ($st === 'IN_USE' && !empty($b['locked_until'])) {
-                            $remainLock = max(0, strtotime($b['locked_until']) - time());
-                        }
-                        ?>
-                        <tr class="data-row" data-status="<?= e($st) ?>" data-bilik-row="<?= (int)$b['id'] ?>">
-                            <td><span class="data-cell-mono fw-600">BILIK #0<?= (int)$b['nomor_bilik'] ?></span></td>
-                            <td>
-                                <div class="fw-600"><?= e($b['nama_bilik']) ?></div>
-                                <div class="text-muted" style="font-size:11px;"><?= e($b['lokasi_bilik'] ?? '-') ?></div>
-                            </td>
-                            <td class="cell-bilik-status">
-                                <?php if ($st === 'CLOSED'): ?>
-                                    <span class="badge danger dot">CLOSED</span>
-                                <?php elseif ($st === 'IN_USE'): ?>
-                                    <span class="badge primary dot">IN_USE</span>
-                                <?php else: ?>
-                                    <span class="badge success dot">IDLE</span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="cell-bilik-token">
-                                <div class="data-cell-mono fw-600"><?= e($tokenShort) ?></div>
-                                <?php if ($st === 'IN_USE'): ?>
-                                    <div class="text-muted mono" style="font-size:10.5px;color:var(--primary);">Sisa Sesi: <?= (int)$remainLock ?>s</div>
-                                <?php elseif ($st === 'IDLE'): ?>
-                                    <div class="text-muted mono" style="font-size:10.5px;">Rotasi Otomatis 8s</div>
-                                <?php else: ?>
-                                    <div class="text-muted mono" style="font-size:10.5px;">Token Dijeda</div>
-                                <?php endif; ?>
-                            </td>
-                            <td class="cell-bilik-nim">
-                                <span class="data-cell-mono fw-600"><?= e($b['active_nim'] ?: '-') ?></span>
-                            </td>
-                            <td class="cell-bilik-suara">
-                                <span class="data-cell-mono fw-600"><?= number_format((int)$b['total_suara_bilik']) ?></span>
-                            </td>
-                            <td class="cell-bilik-fraud">
-                                <?php if ((int)$b['total_fraud_bilik'] > 0): ?>
-                                    <span class="badge danger"><?= (int)$b['total_fraud_bilik'] ?></span>
-                                <?php else: ?>
-                                    <span class="data-cell-mono">0</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <div class="data-cell-actions">
-                                    <a href="<?= e(route_url('portal_qr', ['booth' => (int)$b['nomor_bilik']])) ?>" class="btn btn--soft-primary btn--xs">Buka Layar QR</a>
-                                    <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Reset token QR dan lepas kunci sesi bilik ini?">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="sub_action" value="force_reset_bilik">
-                                        <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
-                                        <button type="submit" class="btn <?= $st === 'IN_USE' ? 'btn--soft-warning' : 'btn--ghost' ?> btn--xs">
-                                            <?= $st === 'IN_USE' ? 'Lepas Kunci' : 'Reset Token' ?>
-                                        </button>
-                                    </form>
-                                    <form action="<?= e(action_url('bilik')) ?>" method="POST">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="sub_action" value="toggle_bilik_status">
-                                        <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
-                                        <input type="hidden" name="target_status" value="<?= $st === 'CLOSED' ? 'IDLE' : 'CLOSED' ?>">
-                                        <button type="submit" class="btn btn--ghost btn--xs">
-                                            <?= $st === 'CLOSED' ? 'Buka' : 'Tutup' ?>
-                                        </button>
-                                    </form>
-                                    <button type="button" class="btn btn--ghost btn--xs" onclick='openEditBilikModal(<?= json_encode($b, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>Edit</button>
-                                    <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Hapus bilik suara ini?">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="sub_action" value="delete_bilik">
-                                        <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
-                                        <button type="submit" class="btn btn--soft-danger btn--xs">×</button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+        <div class="bilik-grid" id="bilikCardsGrid">
+            <?php foreach ($bilikList as $b): ?>
+                <?php
+                $st = $b['status_bilik'];
+                $statusClass = 'status-idle';
+                if ($st === 'IN_USE') $statusClass = 'status-used';
+                elseif ($st === 'CLOSED') $statusClass = 'status-locked';
 
-        <div class="data-foot">
-            <div class="data-foot-info">
-                <span data-dt-info>Showing 0 of 0</span>
-            </div>
-            <div class="pager" data-dt-pager></div>
+                $tokenShort = !empty($b['current_token']) ? strtoupper(substr((string) $b['current_token'], 0, 12)) . '...' : '-';
+                $remainLock = 0;
+                if ($st === 'IN_USE' && !empty($b['locked_until'])) {
+                    $remainLock = max(0, strtotime($b['locked_until']) - time());
+                }
+                $bJson = json_encode($b, JSON_HEX_APOS | JSON_HEX_QUOT);
+                ?>
+                <div class="bilik-card <?= $statusClass ?>" data-bilik-card="<?= (int)$b['id'] ?>" data-status="<?= e($st) ?>">
+                    <!-- Bagian Atas: Nomor Bilik, Nama, Lokasi & Status Badge -->
+                    <div class="bilik-card-head">
+                        <div style="min-width:0;flex:1;">
+                            <span class="kandidat-num-pill">BILIK #0<?= (int)$b['nomor_bilik'] ?></span>
+                            <div class="bilik-card-title"><?= e($b['nama_bilik']) ?></div>
+                            <div class="bilik-card-loc"><?= e($b['lokasi_bilik'] ?: 'Lokasi belum ditentukan') ?></div>
+                        </div>
+                        <div>
+                            <?php if ($st === 'CLOSED'): ?>
+                                <span class="badge danger dot">CLOSED</span>
+                            <?php elseif ($st === 'IN_USE'): ?>
+                                <span class="badge primary dot">IN_USE</span>
+                            <?php else: ?>
+                                <span class="badge success dot">IDLE</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- Bagian Tengah: Telemetri Token, Sesi NIM, Suara Masuk & Fraud -->
+                    <div class="bilik-telemetry">
+                        <div class="bilik-telemetry-grid">
+                            <div style="min-width:0;">
+                                <div class="bilik-meta-label">Token QR & Sesi</div>
+                                <div class="bilik-meta-val"><?= e($tokenShort) ?></div>
+                                <?php if ($st === 'IN_USE'): ?>
+                                    <div class="bilik-meta-sub" style="color:var(--primary);font-weight:600;">Sisa Sesi: <?= (int)$remainLock ?>s</div>
+                                <?php elseif ($st === 'IDLE'): ?>
+                                    <div class="bilik-meta-sub">Rotasi Otomatis 8s</div>
+                                <?php else: ?>
+                                    <div class="bilik-meta-sub" style="color:var(--danger);">Token Dijeda</div>
+                                <?php endif; ?>
+                            </div>
+                            <div style="min-width:0;">
+                                <div class="bilik-meta-label">NIM Sesi Aktif</div>
+                                <div class="bilik-meta-val" style="color:<?= !empty($b['active_nim']) ? 'var(--primary)' : 'var(--t-muted)' ?>;">
+                                    <?= e($b['active_nim'] ?: 'Menunggu Scan') ?>
+                                </div>
+                                <div class="bilik-meta-sub">
+                                    <?= $st === 'IN_USE' ? 'Terkunci perangkat' : 'Siap klaim QR' ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bilik-telemetry-divider">
+                            <div class="d-flex align-center gap-2">
+                                <span class="bilik-meta-label" style="margin:0;">Suara Masuk:</span>
+                                <span class="badge primary"><?= number_format((int)$b['total_suara_bilik']) ?> Suara</span>
+                            </div>
+                            <div class="d-flex align-center gap-2">
+                                <span class="bilik-meta-label" style="margin:0;">Fraud:</span>
+                                <?php if ((int)$b['total_fraud_bilik'] > 0): ?>
+                                    <span class="badge danger"><?= (int)$b['total_fraud_bilik'] ?> Alert</span>
+                                <?php else: ?>
+                                    <span class="badge neutral">0</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bagian Bawah: Footer Aksi Bilik -->
+                    <div class="bilik-card-foot">
+                        <a href="<?= e(route_url('portal_qr', ['booth' => (int)$b['nomor_bilik']])) ?>" class="btn btn--soft-primary btn--xs">
+                            Layar QR ↗
+                        </a>
+                        <div class="data-cell-actions">
+                            <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Reset token QR dan lepas kunci sesi bilik ini?">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="sub_action" value="force_reset_bilik">
+                                <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
+                                <button type="submit" class="btn <?= $st === 'IN_USE' ? 'btn--soft-warning' : 'btn--ghost' ?> btn--xs">
+                                    <?= $st === 'IN_USE' ? 'Lepas Kunci' : 'Reset Token' ?>
+                                </button>
+                            </form>
+                            <form action="<?= e(action_url('bilik')) ?>" method="POST">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="sub_action" value="toggle_bilik_status">
+                                <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
+                                <input type="hidden" name="target_status" value="<?= $st === 'CLOSED' ? 'IDLE' : 'CLOSED' ?>">
+                                <button type="submit" class="btn btn--ghost btn--xs">
+                                    <?= $st === 'CLOSED' ? 'Buka' : 'Tutup' ?>
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn--ghost btn--xs" onclick='openEditBilikModal(<?= $bJson ?>)'>Edit</button>
+                            <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Hapus bilik suara ini?">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="sub_action" value="delete_bilik">
+                                <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
+                                <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Bilik">×</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
     </section>
 </div>
@@ -252,7 +259,7 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <script>
 function openCreateBilikModal() {
-    const nextNum = document.querySelectorAll('tr[data-bilik-row]').length + 1;
+    const nextNum = document.querySelectorAll('[data-bilik-card]').length + 1;
     document.getElementById('bilikModalTitle').textContent = 'Tambah Bilik Suara';
     document.getElementById('bilik_sub_action').value = 'create_bilik';
     document.getElementById('bilik_id').value = 0;
@@ -272,7 +279,24 @@ function openEditBilikModal(b) {
     PemiraApp.openModal('bilikModal');
 }
 
+function applyBilikCardFilter() {
+    const q = (document.getElementById('bilikSearchInput')?.value || '').trim().toLowerCase();
+    const st = document.getElementById('bilikStatusFilter')?.value || 'ALL';
+    document.querySelectorAll('#bilikCardsGrid [data-bilik-card]').forEach(card => {
+        const cardSt = (card.getAttribute('data-status') || '').toUpperCase();
+        const matchSt = (st === 'ALL' || cardSt === st);
+        const matchQ = (!q || card.textContent.toLowerCase().includes(q));
+        card.style.display = (matchSt && matchQ) ? '' : 'none';
+    });
+}
+window.applyBilikCardFilter = applyBilikCardFilter;
+
 document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('bilikSearchInput');
+    const statusFilter = document.getElementById('bilikStatusFilter');
+    if (searchInput) searchInput.addEventListener('input', applyBilikCardFilter);
+    if (statusFilter) statusFilter.addEventListener('change', applyBilikCardFilter);
+
     const btnLive = document.getElementById('btnToggleLiveBilik');
     if (btnLive) {
         btnLive.addEventListener('click', () => {

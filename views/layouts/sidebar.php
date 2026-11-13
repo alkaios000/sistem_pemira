@@ -28,20 +28,20 @@ $userName = $_SESSION['nama_lengkap'] ?? 'Panitia PEMIRA';
         <a href="<?= e(route_url('manajemen_kandidat')) ?>" class="nav-link <?= $currentPage === 'manajemen_kandidat' ? 'is-active' : '' ?>">
             <span>Kandidat & Timses</span>
         </a>
-        <a href="<?= e(route_url('manajemen_bilik')) ?>" class="nav-link <?= $currentPage === 'manajemen_bilik' ? 'is-active' : '' ?>">
-            <span>Manajemen Bilik</span>
+        <a href="<?= e(route_url('portal_qr')) ?>" class="nav-link <?= in_array($currentPage, ['portal_qr', 'manajemen_bilik'], true) ? 'is-active' : '' ?>">
+            <span>Portal QR Bilik</span>
+            <span class="nav-badge">QR</span>
         </a>
         <a href="<?= e(route_url('manajemen_mahasiswa')) ?>" class="nav-link <?= $currentPage === 'manajemen_mahasiswa' ? 'is-active' : '' ?>">
             <span>Data DPT Mahasiswa</span>
         </a>
+        <a href="<?= e(route_url('manajemen_jurusan')) ?>" class="nav-link <?= $currentPage === 'manajemen_jurusan' ? 'is-active' : '' ?>">
+            <span>Manajemen Jurusan</span>
+        </a>
     </nav>
 
     <nav class="nav-section">
-        <div class="nav-label">Operasional & Audit</div>
-        <a href="<?= e(route_url('portal_qr')) ?>" class="nav-link <?= $currentPage === 'portal_qr' ? 'is-active' : '' ?>">
-            <span>Portal QR Bilik</span>
-            <span class="nav-badge">QR</span>
-        </a>
+        <div class="nav-label">Keamanan & Audit</div>
         <a href="<?= e(route_url('log_keamanan')) ?>" class="nav-link <?= $currentPage === 'log_keamanan' ? 'is-active' : '' ?>">
             <span>Log Keamanan</span>
         </a>

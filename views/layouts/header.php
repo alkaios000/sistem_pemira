@@ -25,19 +25,19 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
     <link rel="apple-touch-icon" sizes="512x512" href="<?= e(asset_url('img/icons/icon-512.png')) ?>?v=2">
 
     <!-- Adminator 2026 Modular CSS -->
-    <link rel="stylesheet" href="<?= e(asset_url('css/base.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/layout.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/scrollbar.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/buttons.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/cards.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/forms.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/tables.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/modals.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/badges.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/dashboard.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/portal_qr.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/voting.css')) ?>?v=10">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/live_count.css')) ?>?v=10">
+    <link rel="stylesheet" href="<?= e(asset_url('css/base.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/layout.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/scrollbar.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/buttons.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/cards.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/forms.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/tables.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/modals.css')) ?>?v=15">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/badges.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/dashboard.css')) ?>?v=13">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/portal_qr.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/voting.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/live_count.css')) ?>?v=11">
 
     <script>
         window.PEMIRA_CONFIG = {

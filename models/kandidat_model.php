@@ -4,14 +4,17 @@
  * Menerapkan eager loading untuk mencegah N+1 Query Problem.
  */
 
+require_once BASE_PATH . '/models/jurusan_model.php';
+
 /**
  * Mengambil daftar kandidat beserta daftar tim suksesnya secara efisien (tanpa N+1 query)
  */
 function get_kandidats_by_kategori(PDO $pdo, ?string $kategori = null): array
 {
+    ensure_jurusans_ready($pdo);
     if ($kategori !== null && in_array($kategori, ['BEM', 'BPM'], true)) {
         $stmt = $pdo->prepare('
-            SELECT id, kategori, nomor_urut, nama_calon, nama_wakil, jurusan_kelas,
+            SELECT id, kategori, jurusan_id, nomor_urut, nama_calon, nama_wakil, jurusan_kelas,
                    foto_path, visi, misi, jumlah_suara, created_at, updated_at
             FROM kandidats
             WHERE kategori = :kategori
@@ -20,7 +23,7 @@ function get_kandidats_by_kategori(PDO $pdo, ?string $kategori = null): array
         $stmt->execute([':kategori' => $kategori]);
     } else {
         $stmt = $pdo->query('
-            SELECT id, kategori, nomor_urut, nama_calon, nama_wakil, jurusan_kelas,
+            SELECT id, kategori, jurusan_id, nomor_urut, nama_calon, nama_wakil, jurusan_kelas,
                    foto_path, visi, misi, jumlah_suara, created_at, updated_at
             FROM kandidats
             ORDER BY kategori ASC, nomor_urut ASC
@@ -63,8 +66,9 @@ function get_kandidats_by_kategori(PDO $pdo, ?string $kategori = null): array
  */
 function find_kandidat_by_id(PDO $pdo, int $id): ?array
 {
+    ensure_jurusans_ready($pdo);
     $stmt = $pdo->prepare('
-        SELECT id, kategori, nomor_urut, nama_calon, nama_wakil, jurusan_kelas,
+        SELECT id, kategori, jurusan_id, nomor_urut, nama_calon, nama_wakil, jurusan_kelas,
                foto_path, visi, misi, jumlah_suara, created_at, updated_at
         FROM kandidats
         WHERE id = :id
@@ -94,14 +98,16 @@ function find_kandidat_by_id(PDO $pdo, int $id): ?array
  */
 function create_kandidat(PDO $pdo, array $data, array $timses_list): int
 {
+    ensure_jurusans_ready($pdo);
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare('
-            INSERT INTO kandidats (kategori, nomor_urut, nama_calon, nama_wakil, jurusan_kelas, foto_path, visi, misi, jumlah_suara)
-            VALUES (:kategori, :nomor_urut, :nama_calon, :nama_wakil, :jurusan_kelas, :foto_path, :visi, :misi, 0)
+            INSERT INTO kandidats (kategori, jurusan_id, nomor_urut, nama_calon, nama_wakil, jurusan_kelas, foto_path, visi, misi, jumlah_suara)
+            VALUES (:kategori, :jurusan_id, :nomor_urut, :nama_calon, :nama_wakil, :jurusan_kelas, :foto_path, :visi, :misi, 0)
         ');
         $stmt->execute([
             ':kategori'      => $data['kategori'],
+            ':jurusan_id'    => !empty($data['jurusan_id']) ? (int) $data['jurusan_id'] : null,
             ':nomor_urut'    => (int) $data['nomor_urut'],
             ':nama_calon'    => $data['nama_calon'],
             ':nama_wakil'    => !empty($data['nama_wakil']) ? $data['nama_wakil'] : null,
@@ -127,11 +133,13 @@ function create_kandidat(PDO $pdo, array $data, array $timses_list): int
  */
 function update_kandidat(PDO $pdo, int $id, array $data, array $timses_list): bool
 {
+    ensure_jurusans_ready($pdo);
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare('
             UPDATE kandidats
             SET kategori = :kategori,
+                jurusan_id = :jurusan_id,
                 nomor_urut = :nomor_urut,
                 nama_calon = :nama_calon,
                 nama_wakil = :nama_wakil,
@@ -143,6 +151,7 @@ function update_kandidat(PDO $pdo, int $id, array $data, array $timses_list): bo
         ');
         $stmt->execute([
             ':kategori'      => $data['kategori'],
+            ':jurusan_id'    => !empty($data['jurusan_id']) ? (int) $data['jurusan_id'] : null,
             ':nomor_urut'    => (int) $data['nomor_urut'],
             ':nama_calon'    => $data['nama_calon'],
             ':nama_wakil'    => !empty($data['nama_wakil']) ? $data['nama_wakil'] : null,

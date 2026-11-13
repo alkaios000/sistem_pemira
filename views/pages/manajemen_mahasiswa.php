@@ -1,7 +1,7 @@
 <?php
 /**
  * MANAJEMEN MAHASISWA (DPT) & HIERARKI KELAS - Adminator 2026 Redesign (Fitur 4)
- * Tanpa avatar placeholder inisial, mendukung CRUD Kelas, Check-In Massal per Kelas, dan Import Preview.
+ * Daftar Kelas berbasis Card Grid & Modal Besar Detail Mahasiswa per Kelas (Super Real-Time).
  */
 require_auth();
 require_once BASE_PATH . '/models/mahasiswa_model.php';
@@ -10,10 +10,26 @@ $pdo = get_db_connection();
 $pageTitle = 'Data DPT Mahasiswa';
 
 $kelasList = get_all_kelas_with_stats($pdo);
+$jurusanList = get_all_jurusans($pdo);
 $selectedKelasId = isset($_GET['kelas_id']) ? (int)$_GET['kelas_id'] : 0;
-$selectedKelasInfo = $selectedKelasId > 0 ? find_kelas_by_id($pdo, $selectedKelasId) : null;
-$mahasiswaList = get_mahasiswas_by_filter($pdo, $selectedKelasId > 0 ? $selectedKelasId : null, '', null);
+$allMahasiswa = get_mahasiswas_by_filter($pdo, null, '', null);
 $dptStats = get_dpt_global_stats($pdo);
+
+// Group mahasiswa by kelas_id and attach formatted Indonesian vote timestamp for real-time modal rendering
+$mahasiswaByKelas = [];
+foreach ($allMahasiswa as $m) {
+    $kid = (int)$m['kelas_id'];
+    if (!isset($mahasiswaByKelas[$kid])) {
+        $mahasiswaByKelas[$kid] = [];
+    }
+    $m['waktu_memilih_indo'] = !empty($m['waktu_memilih']) ? format_tanggal_indo($m['waktu_memilih']) : '-';
+    $mahasiswaByKelas[$kid][] = $m;
+}
+
+$kelasMap = [];
+foreach ($kelasList as $kl) {
+    $kelasMap[(int)$kl['id']] = $kl;
+}
 
 $extraScripts = [
     asset_url('js/modules/mahasiswa_import.js')
@@ -24,11 +40,8 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <section class="hero">
     <div class="hero-actions">
-        <?php if ($selectedKelasId > 0): ?>
-            <a href="<?= e(route_url('manajemen_mahasiswa')) ?>" class="btn btn--ghost btn--sm" data-ajax-nav>Semua Kelas</a>
-        <?php endif; ?>
         <button type="button" class="btn btn--ghost btn--sm" onclick="openCreateKelasModal()">+ Tambah Kelas</button>
-        <button type="button" class="btn btn--primary btn--sm" onclick="openAddMahasiswaModal(<?= (int)$selectedKelasId ?>)">+ Tambah / Import DPT</button>
+        <button type="button" class="btn btn--primary btn--sm" onclick="openAddMahasiswaModal(0)">+ Tambah / Import DPT</button>
     </div>
 </section>
 
@@ -68,204 +81,152 @@ require BASE_PATH . '/views/layouts/header.php';
     </div>
 </div>
 
-<div class="grid">
-    <!-- Hierarki Kelas (Sesuai app.md Poin 5.4: Kelola Kelas -> Masuk Detail Kelas) -->
-    <section class="col-12 card" id="kelasMasterCard">
-        <div class="card-head">
-            <div class="card-title-wrap">
-                <h3 class="card-title">Daftar Kelas (Klik Kelas untuk Filter Mahasiswa)</h3>
+<!-- JSON Payload for Real-Time Detail Kelas Modal -->
+<script type="application/json" id="kelasDataPayload"><?= json_encode([
+    'kelas' => $kelasMap,
+    'mahasiswaByKelas' => $mahasiswaByKelas,
+    'actionUrl' => action_url('mahasiswa'),
+    'csrfToken' => csrf_token()
+], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?></script>
+
+<!-- Card Grid Daftar Kelas -->
+<section class="card">
+    <div class="card-head" style="flex-wrap:wrap;gap:12px;">
+        <div class="card-title-wrap">
+            <h3 class="card-title">Daftar Kelas</h3>
+        </div>
+        <div class="d-flex align-center gap-2" style="flex-wrap:wrap;">
+            <div class="input-icon" style="width:230px;">
+                <span class="ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
+                <input type="search" id="kelasSearchInput" class="input" placeholder="Cari kelas atau jurusan..." oninput="applyKelasCardFilter()">
             </div>
-            <span class="badge primary"><?= count($kelasList) ?> Kelas</span>
+            <span class="badge primary" id="kelasCountBadge"><?= count($kelasList) ?> Kelas</span>
         </div>
+    </div>
 
-        <div class="data-table-wrap">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Kelas</th>
-                        <th>Jurusan</th>
-                        <th>Semester</th>
-                        <th>Mahasiswa</th>
-                        <th>Hadir (Check-In)</th>
-                        <th>Sudah Memilih</th>
-                        <th class="text-right">Aksi Kelas</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($kelasList)): ?>
-                        <tr><td colspan="7" class="table-empty">Belum ada kelas. Buat kelas terlebih dahulu.</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($kelasList as $kl): ?>
-                            <?php $isSelected = ($selectedKelasId === (int)$kl['id']); ?>
-                            <tr class="data-row <?= $isSelected ? 'is-selected' : '' ?>">
-                                <td>
-                                    <a href="<?= e(route_url('manajemen_mahasiswa', ['kelas_id' => (int)$kl['id']])) ?>" class="badge primary" data-ajax-nav>
-                                        <?= e($kl['nama_kelas']) ?>
-                                    </a>
-                                </td>
-                                <td class="fw-600"><?= e($kl['jurusan']) ?></td>
-                                <td><span class="data-cell-mono">Smt <?= (int)$kl['semester'] ?></span></td>
-                                <td><span class="data-cell-mono fw-600"><?= (int)$kl['total_mahasiswa'] ?></span></td>
-                                <td><span class="badge info dot"><?= (int)$kl['jumlah_hadir'] ?> / <?= (int)$kl['total_mahasiswa'] ?></span></td>
-                                <td>
-                                    <span class="badge success dot"><?= (int)$kl['jumlah_sudah_memilih'] ?> Sudah</span>
-                                    <span class="badge neutral"><?= (int)$kl['jumlah_belum_memilih'] ?> Belum</span>
-                                </td>
-                                <td>
-                                    <div class="data-cell-actions">
-                                        <a href="<?= e(route_url('manajemen_mahasiswa', ['kelas_id' => (int)$kl['id']])) ?>" class="btn btn--soft-primary btn--xs" data-ajax-nav>Buka Kelas</a>
-                                        <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" style="display:inline;">
-                                            <?= csrf_field() ?>
-                                            <input type="hidden" name="sub_action" value="set_all_hadir_kelas">
-                                            <input type="hidden" name="kelas_id" value="<?= (int)$kl['id'] ?>">
-                                            <input type="hidden" name="status_hadir" value="1">
-                                            <button type="submit" class="btn btn--ghost btn--xs" title="Aktifkan Check-In seluruh mahasiswa kelas ini">Check-In Semua</button>
-                                        </form>
-                                        <button type="button" class="btn btn--ghost btn--xs" onclick='openEditKelasModal(<?= json_encode($kl, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>Edit</button>
-                                        <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" data-confirm="Hapus kelas ini beserta seluruh mahasiswa di dalamnya?">
-                                            <?= csrf_field() ?>
-                                            <input type="hidden" name="sub_action" value="delete_kelas">
-                                            <input type="hidden" name="id" value="<?= (int)$kl['id'] ?>">
-                                            <button type="submit" class="btn btn--soft-danger btn--xs">×</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </section>
+    <div class="kelas-grid" id="kelasCardsGrid">
+        <?php if (empty($kelasList)): ?>
+            <div class="table-empty" style="grid-column: 1 / -1;">Belum ada data kelas. Klik <strong>+ Tambah Kelas</strong> untuk membuat kelas baru.</div>
+        <?php else: ?>
+            <?php foreach ($kelasList as $kl): ?>
+                <?php
+                $klId = (int)$kl['id'];
+                $totalMhs = (int)$kl['total_mahasiswa'];
+                $jmlHadir = (int)$kl['jumlah_hadir'];
+                $jmlSudah = (int)$kl['jumlah_sudah_memilih'];
+                $pctVote = $totalMhs > 0 ? round(($jmlSudah / $totalMhs) * 100) : 0;
+                $searchHaystack = strtolower($kl['nama_kelas'] . ' ' . $kl['jurusan'] . ' semester ' . $kl['semester']);
+                ?>
+                <article class="kelas-card" data-kelas-card data-search="<?= e($searchHaystack) ?>">
+                    <div class="kelas-card-head" onclick="openDetailKelasModal(<?= $klId ?>)">
+                        <span class="kelas-card-code"><?= e($kl['nama_kelas']) ?></span>
+                        <span class="kelas-card-total"><?= $totalMhs ?> Mahasiswa</span>
+                    </div>
 
-    <!-- Adminator 2026 Data Table Mahasiswa (Tanpa Avatar Placeholder) -->
-    <section class="col-12 card" data-datatable-card>
-        <div class="card-head">
-            <div class="card-title-wrap">
-                <h3 class="card-title">
-                    <?php if ($selectedKelasInfo): ?>
-                        Mahasiswa Kelas <?= e($selectedKelasInfo['nama_kelas']) ?> (<?= e($selectedKelasInfo['jurusan']) ?> · Semester <?= (int)$selectedKelasInfo['semester'] ?>)
-                    <?php else: ?>
-                        Seluruh Mahasiswa Terdaftar
-                    <?php endif; ?>
-                </h3>
+                    <div class="kelas-card-info" onclick="openDetailKelasModal(<?= $klId ?>)">
+                        <div class="kelas-card-major" title="<?= e($kl['jurusan']) ?>"><?= e($kl['jurusan']) ?></div>
+                        <div class="kelas-card-sem">Semester <?= (int)$kl['semester'] ?></div>
+                    </div>
+
+                    <div class="kelas-card-progress" onclick="openDetailKelasModal(<?= $klId ?>)">
+                        <div class="kelas-card-metrics">
+                            <span>Hadir <strong><?= $jmlHadir ?>/<?= $totalMhs ?></strong></span>
+                            <span>Memilih <strong><?= $jmlSudah ?>/<?= $totalMhs ?></strong> (<?= $pctVote ?>%)</span>
+                        </div>
+                        <div class="progress" style="height:5px;">
+                            <div class="progress-bar <?= $pctVote >= 100 ? 'success' : '' ?>" style="width: <?= min(100, $pctVote) ?>%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="kelas-card-foot">
+                        <button type="button" class="btn btn--soft-primary btn--xs" style="flex:1;" onclick="openDetailKelasModal(<?= $klId ?>)">
+                            Buka Kelas
+                        </button>
+                        <div class="data-cell-actions">
+                            <button type="button" class="btn btn--ghost btn--xs" onclick='openEditKelasModal(<?= json_encode($kl, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>Edit</button>
+                            <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" data-confirm="Hapus kelas <?= e($kl['nama_kelas']) ?> beserta seluruh mahasiswa di dalamnya?" style="display:inline;">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="sub_action" value="delete_kelas">
+                                <input type="hidden" name="id" value="<?= $klId ?>">
+                                <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Kelas">×</button>
+                            </form>
+                        </div>
+                    </div>
+                </article>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+</section>
+
+<!-- Modal Besar Detail Mahasiswa per Kelas -->
+<div class="modal-backdrop" id="detailKelasModal">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-head">
+            <div>
+                <h3 class="modal-title" id="dkTitle">Detail Kelas</h3>
+                <div class="hint" id="dkSummaryText" style="margin-top:2px;">-</div>
             </div>
-            <?php if ($selectedKelasInfo): ?>
-                <button type="button" class="btn btn--primary btn--xs" onclick="openAddMahasiswaModal(<?= (int)$selectedKelasInfo['id'] ?>)">+ Mahasiswa ke <?= e($selectedKelasInfo['nama_kelas']) ?></button>
-            <?php endif; ?>
+            <button type="button" class="modal-close" data-modal-close="detailKelasModal">×</button>
         </div>
 
-        <div class="data-toolbar">
-            <div class="data-toolbar-left">
-                <div class="input-icon" style="flex:1;max-width:320px;">
-                    <span class="ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
-                    <input type="search" class="input" data-dt-search placeholder="Cari nama lengkap, NIM, atau kelas...">
+        <div class="modal-body">
+            <!-- Toolbar Minimalis -->
+            <div class="data-toolbar">
+                <div class="data-toolbar-left" style="flex:1;min-width:220px;">
+                    <div class="input-icon" style="flex:1;max-width:260px;">
+                        <span class="ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
+                        <input type="search" id="dkSearchInput" class="input" placeholder="Cari nama atau NIM..." oninput="renderDetailKelasRows()">
+                    </div>
+                    <select id="dkFilterStatus" class="select" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;" onchange="renderDetailKelasRows()">
+                        <option value="ALL">Semua Status</option>
+                        <option value="SUDAH">Sudah Memilih</option>
+                        <option value="BELUM">Belum Memilih</option>
+                        <option value="NON_HADIR">Belum Check-In</option>
+                    </select>
+                </div>
+                <div class="data-toolbar-right" style="gap:6px;">
+                    <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" style="display:inline;">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="sub_action" value="set_all_hadir_kelas">
+                        <input type="hidden" name="kelas_id" id="dk_checkall_kelas_id" value="0">
+                        <input type="hidden" name="status_hadir" value="1">
+                        <button type="submit" class="btn btn--ghost btn--xs">Check-In Semua</button>
+                    </form>
+                    <button type="button" class="btn btn--primary btn--xs" onclick="openAddMahasiswaModal(window.activeDetailKelasId || 0)">
+                        + Tambah Mahasiswa
+                    </button>
                 </div>
             </div>
-            <div class="data-toolbar-right">
-                <select class="select" data-dt-filter="data-kelas" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
-                    <option value="ALL">Semua Kelas</option>
-                    <?php foreach ($kelasList as $kl): ?>
-                        <option value="<?= e($kl['nama_kelas']) ?>">
-                            <?= e($kl['nama_kelas']) ?> (<?= (int)$kl['total_mahasiswa'] ?>)
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <select class="select" data-dt-filter="data-status" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
-                    <option value="ALL">Semua Status</option>
-                    <option value="SUDAH">Sudah Memilih</option>
-                    <option value="BELUM">Belum Memilih</option>
-                </select>
-                <select class="select" data-dt-perpage style="width:auto;padding:6px 26px 6px 10px;font-size:12px;">
-                    <option value="10">10 / hal</option>
-                    <option value="20" selected>20 / hal</option>
-                    <option value="50">50 / hal</option>
-                </select>
+
+            <!-- Tabel Daftar Mahasiswa Kelas -->
+            <div class="data-table-wrap dk-table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>NIM</th>
+                            <th>Nama Lengkap</th>
+                            <th>Check-In</th>
+                            <th>Status Suara</th>
+                            <th class="text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dkMahasiswaTbody">
+                        <tr><td colspan="5" class="table-empty">Pilih kelas untuk melihat daftar mahasiswa.</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <div class="data-table-wrap">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th data-sort>Mahasiswa <span class="sort">▾</span></th>
-                        <th data-sort>NIM <span class="sort">▾</span></th>
-                        <th data-sort>Kelas <span class="sort">▾</span></th>
-                        <th>Check-In</th>
-                        <th data-sort>Status Suara <span class="sort">▾</span></th>
-                        <th data-sort>Waktu Memilih <span class="sort">▾</span></th>
-                        <th class="text-right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($mahasiswaList)): ?>
-                        <tr><td colspan="7" class="table-empty">Belum ada mahasiswa pada kelas ini.</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($mahasiswaList as $m): ?>
-                            <?php
-                            $sudahVote = ((int)$m['sudah_memilih'] === 1);
-                            $statusHadir = ((int)$m['status_hadir'] === 1);
-                            ?>
-                            <tr class="data-row" data-kelas="<?= e($m['nama_kelas']) ?>" data-status="<?= $sudahVote ? 'SUDAH' : 'BELUM' ?>">
-                                <td>
-                                    <div class="data-cell-user-meta">
-                                        <div class="data-cell-user-name"><?= e($m['nama_lengkap']) ?></div>
-                                        <div class="data-cell-user-email"><?= e($m['jurusan']) ?> · Smt <?= (int)$m['semester'] ?></div>
-                                    </div>
-                                </td>
-                                <td><span class="data-cell-mono fw-600"><?= e($m['nim']) ?></span></td>
-                                <td><span class="badge primary"><?= e($m['nama_kelas']) ?></span></td>
-                                <td>
-                                    <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" style="display:inline;">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="sub_action" value="toggle_hadir">
-                                        <input type="hidden" name="id" value="<?= (int)$m['id'] ?>">
-                                        <input type="hidden" name="kelas_id" value="<?= (int)$m['kelas_id'] ?>">
-                                        <input type="hidden" name="status_hadir" value="<?= $statusHadir ? 0 : 1 ?>">
-                                        <button type="submit" class="badge <?= $statusHadir ? 'info' : 'neutral' ?> dot" style="cursor:pointer;border:0;">
-                                            <?= $statusHadir ? 'Aktif' : 'Nonaktif' ?>
-                                        </button>
-                                    </form>
-                                </td>
-                                <td>
-                                    <?php if ($sudahVote): ?>
-                                        <span class="badge success dot">Sudah Memilih</span>
-                                    <?php else: ?>
-                                        <span class="badge neutral">Belum Memilih</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td><span class="data-cell-mono"><?= !empty($m['waktu_memilih']) ? e(format_tanggal_indo($m['waktu_memilih'])) : '-' ?></span></td>
-                                <td>
-                                    <div class="data-cell-actions">
-                                        <button type="button" class="btn btn--ghost btn--xs" onclick='openEditMahasiswaModal(<?= json_encode($m, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>Edit</button>
-                                        <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" data-confirm="Hapus mahasiswa ini dari DPT?">
-                                            <?= csrf_field() ?>
-                                            <input type="hidden" name="sub_action" value="delete_mahasiswa">
-                                            <input type="hidden" name="id" value="<?= (int)$m['id'] ?>">
-                                            <input type="hidden" name="kelas_id" value="<?= (int)$m['kelas_id'] ?>">
-                                            <button type="submit" class="btn btn--soft-danger btn--xs">×</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+        <div class="modal-foot" style="justify-content:space-between;">
+            <span class="hint" id="dkFooterInfo">0 mahasiswa</span>
+            <button type="button" class="btn btn--ghost btn--sm" data-modal-close="detailKelasModal">Tutup</button>
         </div>
-
-        <div class="data-foot">
-            <div class="data-foot-info">
-                <span data-dt-info>Showing 0 of 0</span>
-            </div>
-            <div class="pager" data-dt-pager></div>
-        </div>
-    </section>
+    </div>
 </div>
 
 <!-- Modal Tambah / Import Mahasiswa -->
 <div class="modal-backdrop" id="mahasiswaModal">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-md">
         <div class="modal-head">
             <h3 class="modal-title" id="mhsModalTitle">Tambah / Import DPT</h3>
             <button type="button" class="modal-close" data-modal-close="mahasiswaModal">×</button>
@@ -394,8 +355,18 @@ require BASE_PATH . '/views/layouts/header.php';
                     <input type="text" name="nama_kelas" id="kelas_nama_input" class="input mono" placeholder="TI-3C" required>
                 </div>
                 <div class="field">
-                    <label class="field-label">Program Studi / Jurusan</label>
-                    <input type="text" name="jurusan" id="kelas_jurusan_input" class="input" placeholder="Teknik Informatika" required>
+                    <label class="field-label">
+                        <span>Program Studi / Jurusan</span>
+                        <a href="<?= e(route_url('manajemen_jurusan')) ?>" class="hint" style="color:var(--primary);text-decoration:none;">Kelola Jurusan ↗</a>
+                    </label>
+                    <select name="jurusan_id" id="kelas_jurusan_input" class="select" required>
+                        <option value="">-- Pilih Jurusan --</option>
+                        <?php foreach ($jurusanList as $jur): ?>
+                            <option value="<?= (int)$jur['id'] ?>" data-nama="<?= e($jur['nama_jurusan']) ?>">
+                                <?= e($jur['nama_jurusan']) ?> (<?= e($jur['kode_jurusan']) ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="field mb-0">
                     <label class="field-label">Semester</label>
@@ -411,6 +382,183 @@ require BASE_PATH . '/views/layouts/header.php';
 </div>
 
 <script>
+window.activeDetailKelasId = 0;
+
+function getKelasPayload() {
+    const el = document.getElementById('kelasDataPayload');
+    if (!el) return { kelas: {}, mahasiswaByKelas: {}, actionUrl: '', csrfToken: '' };
+    try {
+        return JSON.parse(el.textContent || '{}');
+    } catch (_) {
+        return { kelas: {}, mahasiswaByKelas: {}, actionUrl: '', csrfToken: '' };
+    }
+}
+
+function escapeHtmlStr(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function applyKelasCardFilter() {
+    const q = (document.getElementById('kelasSearchInput')?.value || '').trim().toLowerCase();
+    const cards = document.querySelectorAll('#kelasCardsGrid [data-kelas-card]');
+    let visibleCount = 0;
+    cards.forEach(card => {
+        const hay = (card.getAttribute('data-search') || '').toLowerCase();
+        const match = !q || hay.includes(q);
+        card.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+    const badge = document.getElementById('kelasCountBadge');
+    if (badge) {
+        badge.textContent = visibleCount + ' Kelas';
+    }
+}
+window.applyKelasCardFilter = applyKelasCardFilter;
+
+function openDetailKelasModal(kelasId, resetFilter = true) {
+    const payload = getKelasPayload();
+    const kl = payload.kelas?.[kelasId];
+    if (!kl) {
+        PemiraApp.closeModal('detailKelasModal');
+        window.activeDetailKelasId = 0;
+        return;
+    }
+
+    window.activeDetailKelasId = Number(kelasId);
+
+    const total = Number(kl.total_mahasiswa || 0);
+    const hadir = Number(kl.jumlah_hadir || 0);
+    const sudah = Number(kl.jumlah_sudah_memilih || 0);
+
+    document.getElementById('dkTitle').textContent = (kl.nama_kelas || '-') + ' · ' + (kl.jurusan || '-');
+    document.getElementById('dkSummaryText').textContent = `Semester ${kl.semester || '-'} · ${total} Mahasiswa · ${hadir} Hadir · ${sudah} Sudah Memilih`;
+    document.getElementById('dk_checkall_kelas_id').value = kelasId;
+
+    if (resetFilter) {
+        const searchEl = document.getElementById('dkSearchInput');
+        const filterEl = document.getElementById('dkFilterStatus');
+        if (searchEl) searchEl.value = '';
+        if (filterEl) filterEl.value = 'ALL';
+    }
+
+    renderDetailKelasRows();
+    PemiraApp.openModal('detailKelasModal');
+}
+window.openDetailKelasModal = openDetailKelasModal;
+
+function refreshOpenDetailKelasModal() {
+    const modal = document.getElementById('detailKelasModal');
+    if (modal && modal.classList.contains('is-open') && window.activeDetailKelasId > 0) {
+        openDetailKelasModal(window.activeDetailKelasId, false);
+    }
+}
+window.refreshOpenDetailKelasModal = refreshOpenDetailKelasModal;
+
+function renderDetailKelasRows() {
+    const kelasId = window.activeDetailKelasId;
+    const payload = getKelasPayload();
+    const list = payload.mahasiswaByKelas?.[kelasId] || [];
+    const actionUrl = escapeHtmlStr(payload.actionUrl || '');
+    const csrfToken = escapeHtmlStr(payload.csrfToken || '');
+
+    const q = (document.getElementById('dkSearchInput')?.value || '').trim().toLowerCase();
+    const statusFilter = document.getElementById('dkFilterStatus')?.value || 'ALL';
+
+    const filtered = list.filter(m => {
+        const matchQ = !q ||
+            String(m.nama_lengkap || '').toLowerCase().includes(q) ||
+            String(m.nim || '').toLowerCase().includes(q);
+        if (!matchQ) return false;
+
+        const sudahVote = Number(m.sudah_memilih) === 1;
+        const statusHadir = Number(m.status_hadir) === 1;
+
+        if (statusFilter === 'SUDAH' && !sudahVote) return false;
+        if (statusFilter === 'BELUM' && sudahVote) return false;
+        if (statusFilter === 'NON_HADIR' && statusHadir) return false;
+        return true;
+    });
+
+    const tbody = document.getElementById('dkMahasiswaTbody');
+    const footerInfo = document.getElementById('dkFooterInfo');
+    if (footerInfo) {
+        footerInfo.textContent = `${filtered.length} dari ${list.length} mahasiswa`;
+    }
+
+    if (!tbody) return;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="table-empty">${
+            list.length === 0
+                ? 'Belum ada mahasiswa di kelas ini.'
+                : 'Tidak ada mahasiswa yang cocok.'
+        }</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(m => {
+        const sudahVote = Number(m.sudah_memilih) === 1;
+        const statusHadir = Number(m.status_hadir) === 1;
+        const nextHadir = statusHadir ? 0 : 1;
+        const voteTime = m.waktu_memilih_indo && m.waktu_memilih_indo !== '-' ? ` (${m.waktu_memilih_indo})` : '';
+        const mJsonAttr = escapeHtmlStr(JSON.stringify({
+            id: m.id,
+            nim: m.nim,
+            nama_lengkap: m.nama_lengkap,
+            kelas_id: m.kelas_id,
+            status_hadir: m.status_hadir
+        }));
+
+        return `
+            <tr class="data-row">
+                <td><span class="data-cell-mono fw-600">${escapeHtmlStr(m.nim)}</span></td>
+                <td><span class="fw-600">${escapeHtmlStr(m.nama_lengkap)}</span></td>
+                <td>
+                    <form action="${actionUrl}" method="POST" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="${csrfToken}">
+                        <input type="hidden" name="sub_action" value="toggle_hadir">
+                        <input type="hidden" name="id" value="${Number(m.id)}">
+                        <input type="hidden" name="kelas_id" value="${Number(m.kelas_id)}">
+                        <input type="hidden" name="status_hadir" value="${nextHadir}">
+                        <button type="submit" class="badge ${statusHadir ? 'info' : 'neutral'} dot" style="cursor:pointer;border:0;" title="Klik untuk ubah status Check-In">
+                            ${statusHadir ? 'Hadir' : 'Belum'}
+                        </button>
+                    </form>
+                </td>
+                <td>
+                    ${sudahVote
+                        ? `<span class="badge success dot" title="Memilih${escapeHtmlStr(voteTime)}">Sudah Memilih</span>`
+                        : '<span class="badge neutral">Belum</span>'}
+                </td>
+                <td>
+                    <div class="data-cell-actions">
+                        <button type="button" class="btn btn--ghost btn--xs" data-mhs-edit="${mJsonAttr}" onclick="openEditMahasiswaFromBtn(this)">Edit</button>
+                        <form action="${actionUrl}" method="POST" data-confirm="Hapus mahasiswa ${escapeHtmlStr(m.nama_lengkap)} (${escapeHtmlStr(m.nim)}) dari DPT?" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="${csrfToken}">
+                            <input type="hidden" name="sub_action" value="delete_mahasiswa">
+                            <input type="hidden" name="id" value="${Number(m.id)}">
+                            <input type="hidden" name="kelas_id" value="${Number(m.kelas_id)}">
+                            <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Mahasiswa">×</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openEditMahasiswaFromBtn(btn) {
+    try {
+        const m = JSON.parse(btn.getAttribute('data-mhs-edit') || '{}');
+        if (m && m.id) openEditMahasiswaModal(m);
+    } catch (_) {}
+}
+
 function switchMhsTab(tab) {
     const isManual = (tab === 'manual');
     document.getElementById('tabPaneManual').style.display = isManual ? 'block' : 'none';
@@ -434,7 +582,15 @@ function openEditKelasModal(kl) {
     document.getElementById('kelas_sub_action').value = 'update_kelas';
     document.getElementById('kelas_id_input').value = kl.id;
     document.getElementById('kelas_nama_input').value = kl.nama_kelas || '';
-    document.getElementById('kelas_jurusan_input').value = kl.jurusan || '';
+    const jurSel = document.getElementById('kelas_jurusan_input');
+    if (jurSel) {
+        if (kl.jurusan_id && jurSel.querySelector(`option[value="${kl.jurusan_id}"]`)) {
+            jurSel.value = String(kl.jurusan_id);
+        } else {
+            const matchedOpt = Array.from(jurSel.options).find(o => (o.getAttribute('data-nama') || '').toLowerCase() === String(kl.jurusan || '').trim().toLowerCase());
+            jurSel.value = matchedOpt ? matchedOpt.value : '';
+        }
+    }
     document.getElementById('kelas_semester_input').value = kl.semester || 1;
     PemiraApp.openModal('kelasModal');
 }
@@ -447,9 +603,11 @@ function openAddMahasiswaModal(defaultKelasId = 0) {
     document.getElementById('mhs_nim').value = '';
     document.getElementById('mhs_nama').value = '';
     document.getElementById('mhs_hadir').value = '1';
-    if (defaultKelasId > 0) {
-        document.getElementById('mhs_kelas').value = defaultKelasId;
-        document.getElementById('import_kelas_id').value = defaultKelasId;
+    const isDetailOpen = document.getElementById('detailKelasModal')?.classList.contains('is-open');
+    const targetKelasId = defaultKelasId > 0 ? defaultKelasId : (isDetailOpen ? (window.activeDetailKelasId || 0) : 0);
+    document.getElementById('mhs_kelas').value = targetKelasId > 0 ? targetKelasId : '';
+    if (targetKelasId > 0) {
+        document.getElementById('import_kelas_id').value = targetKelasId;
     }
     switchMhsTab('manual');
     PemiraApp.openModal('mahasiswaModal');
@@ -467,6 +625,13 @@ function openEditMahasiswaModal(m) {
     switchMhsTab('manual');
     PemiraApp.openModal('mahasiswaModal');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const initialKelasId = <?= (int)$selectedKelasId ?>;
+    if (initialKelasId > 0) {
+        openDetailKelasModal(initialKelasId);
+    }
+});
 </script>
 
 <?php require BASE_PATH . '/views/layouts/footer.php'; ?>

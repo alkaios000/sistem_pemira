@@ -3,6 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS `kelas` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `jurusan_id` INT UNSIGNED DEFAULT NULL,
     `nama_kelas` VARCHAR(100) NOT NULL,
     `jurusan` VARCHAR(120) NOT NULL,
     `semester` TINYINT UNSIGNED NOT NULL,
@@ -10,6 +11,7 @@ CREATE TABLE IF NOT EXISTS `kelas` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_kelas_kombinasi` (`nama_kelas`, `jurusan`, `semester`),
+    KEY `idx_kelas_jurusan_id` (`jurusan_id`),
     KEY `idx_kelas_jurusan` (`jurusan`),
     KEY `idx_kelas_semester` (`semester`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

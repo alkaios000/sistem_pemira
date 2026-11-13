@@ -41,12 +41,28 @@
     transform: translateY(0);
 }
 
+.modal-dialog.modal-md {
+    max-width: 580px;
+}
+
 .modal-dialog.modal-lg {
     max-width: 720px;
 }
 
 .modal-dialog.modal-xl {
-    max-width: 920px;
+    max-width: 1020px;
+}
+
+/* Stacked Modals Support (e.g. Form Modal or Confirm Modal opened inside Detail Kelas Modal) */
+#mahasiswaModal,
+#kelasModal,
+#kandidatModal,
+#jurusanModal {
+    z-index: 1050;
+}
+
+#globalConfirmModal {
+    z-index: 1100;
 }
 
 .modal-dialog.modal-sm {
@@ -61,6 +77,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    flex-shrink: 0;
 }
 
 .modal-title {
@@ -105,6 +122,7 @@
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 /* Adminator Tabs (Pills & Underline) */
@@ -155,4 +173,54 @@
     background: var(--bg-card);
     box-shadow: var(--shadow-sm);
     color: var(--t-base);
+}
+
+/* Fixed-height layout for Detail Kelas large modal */
+#detailKelasModal .modal-dialog {
+    height: min(600px, 86vh);
+}
+
+#detailKelasModal .modal-body {
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#detailKelasModal .data-toolbar {
+    margin-bottom: 0;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--bg-hover);
+    flex-shrink: 0;
+}
+
+#detailKelasModal .dk-table-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+}
+
+#detailKelasModal .dk-table-scroll .data-table {
+    width: 100%;
+    margin: 0;
+}
+
+#detailKelasModal .dk-table-scroll .data-table thead th {
+    z-index: 2;
+    cursor: default;
+}
+
+#detailKelasModal .dk-table-scroll .data-table tbody td {
+    border-bottom: 1px solid var(--border-soft);
+}
+
+#detailKelasModal .dk-table-scroll .data-table tbody td.table-empty {
+    border-bottom: 0;
+    padding: 48px 16px;
 }

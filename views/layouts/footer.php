@@ -22,9 +22,9 @@ $extraScripts = $extraScripts ?? [];
 
 <?php require BASE_PATH . '/views/layouts/modal_global.php'; ?>
 
-<script src="<?= e(asset_url('js/app.js')) ?>?v=7"></script>
+<script src="<?= e(asset_url('js/app.js')) ?>?v=13"></script>
 <?php foreach ($extraScripts as $scriptPath): ?>
-    <script src="<?= e($scriptPath) ?><?= str_contains($scriptPath, 'http') ? '' : '?v=7' ?>"></script>
+    <script src="<?= e($scriptPath) ?><?= str_contains($scriptPath, 'http') ? '' : '?v=13' ?>"></script>
 <?php endforeach; ?>
 </body>
 </html>

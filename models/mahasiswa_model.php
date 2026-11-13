@@ -4,16 +4,21 @@
  * Menerapkan agregasi query yang efisien dan mendukung Batch Import / Preview.
  */
 
+require_once BASE_PATH . '/models/jurusan_model.php';
+
 /**
  * Mengambil seluruh daftar kelas beserta jumlah mahasiswa yang sudah dan belum memilih dalam 1 query
  */
 function get_all_kelas_with_stats(PDO $pdo): array
 {
+    ensure_jurusans_ready($pdo);
     $stmt = $pdo->query('
         SELECT
             k.id,
+            k.jurusan_id,
             k.nama_kelas,
-            k.jurusan,
+            COALESCE(j.nama_jurusan, k.jurusan) AS jurusan,
+            j.kode_jurusan,
             k.semester,
             k.created_at,
             COUNT(m.id) AS total_mahasiswa,
@@ -21,9 +26,10 @@ function get_all_kelas_with_stats(PDO $pdo): array
             COALESCE(SUM(CASE WHEN m.sudah_memilih = 0 THEN 1 ELSE 0 END), 0) AS jumlah_belum_memilih,
             COALESCE(SUM(CASE WHEN m.status_hadir = 1 THEN 1 ELSE 0 END), 0) AS jumlah_hadir
         FROM kelas k
+        LEFT JOIN jurusans j ON j.id = k.jurusan_id
         LEFT JOIN mahasiswas m ON m.kelas_id = k.id
-        GROUP BY k.id, k.nama_kelas, k.jurusan, k.semester, k.created_at
-        ORDER BY k.semester ASC, k.jurusan ASC, k.nama_kelas ASC
+        GROUP BY k.id, k.jurusan_id, k.nama_kelas, j.nama_jurusan, j.kode_jurusan, k.jurusan, k.semester, k.created_at
+        ORDER BY k.semester ASC, jurusan ASC, k.nama_kelas ASC
     ');
     return $stmt->fetchAll();
 }
@@ -33,11 +39,14 @@ function get_all_kelas_with_stats(PDO $pdo): array
  */
 function find_kelas_by_id(PDO $pdo, int $id): ?array
 {
+    ensure_jurusans_ready($pdo);
     $stmt = $pdo->prepare('
         SELECT
             k.id,
+            k.jurusan_id,
             k.nama_kelas,
-            k.jurusan,
+            COALESCE(j.nama_jurusan, k.jurusan) AS jurusan,
+            j.kode_jurusan,
             k.semester,
             k.created_at,
             COUNT(m.id) AS total_mahasiswa,
@@ -45,9 +54,10 @@ function find_kelas_by_id(PDO $pdo, int $id): ?array
             COALESCE(SUM(CASE WHEN m.sudah_memilih = 0 THEN 1 ELSE 0 END), 0) AS jumlah_belum_memilih,
             COALESCE(SUM(CASE WHEN m.status_hadir = 1 THEN 1 ELSE 0 END), 0) AS jumlah_hadir
         FROM kelas k
+        LEFT JOIN jurusans j ON j.id = k.jurusan_id
         LEFT JOIN mahasiswas m ON m.kelas_id = k.id
         WHERE k.id = :id
-        GROUP BY k.id, k.nama_kelas, k.jurusan, k.semester, k.created_at
+        GROUP BY k.id, k.jurusan_id, k.nama_kelas, j.nama_jurusan, j.kode_jurusan, k.jurusan, k.semester, k.created_at
         LIMIT 1
     ');
     $stmt->execute([':id' => $id]);
@@ -58,13 +68,15 @@ function find_kelas_by_id(PDO $pdo, int $id): ?array
 /**
  * Menambahkan kelas baru
  */
-function create_kelas(PDO $pdo, string $nama_kelas, string $jurusan, int $semester): int
+function create_kelas(PDO $pdo, string $nama_kelas, string $jurusan, int $semester, ?int $jurusan_id = null): int
 {
+    ensure_jurusans_ready($pdo);
     $stmt = $pdo->prepare('
-        INSERT INTO kelas (nama_kelas, jurusan, semester)
-        VALUES (:nama_kelas, :jurusan, :semester)
+        INSERT INTO kelas (jurusan_id, nama_kelas, jurusan, semester)
+        VALUES (:jurusan_id, :nama_kelas, :jurusan, :semester)
     ');
     $stmt->execute([
+        ':jurusan_id' => $jurusan_id,
         ':nama_kelas' => $nama_kelas,
         ':jurusan'    => $jurusan,
         ':semester'   => $semester,
@@ -75,16 +87,19 @@ function create_kelas(PDO $pdo, string $nama_kelas, string $jurusan, int $semest
 /**
  * Memperbarui data kelas
  */
-function update_kelas(PDO $pdo, int $id, string $nama_kelas, string $jurusan, int $semester): bool
+function update_kelas(PDO $pdo, int $id, string $nama_kelas, string $jurusan, int $semester, ?int $jurusan_id = null): bool
 {
+    ensure_jurusans_ready($pdo);
     $stmt = $pdo->prepare('
         UPDATE kelas
-        SET nama_kelas = :nama_kelas,
+        SET jurusan_id = :jurusan_id,
+            nama_kelas = :nama_kelas,
             jurusan = :jurusan,
             semester = :semester
         WHERE id = :id
     ');
     return $stmt->execute([
+        ':jurusan_id' => $jurusan_id,
         ':nama_kelas' => $nama_kelas,
         ':jurusan'    => $jurusan,
         ':semester'   => $semester,

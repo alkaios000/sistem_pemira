@@ -3,6 +3,7 @@
 CREATE TABLE IF NOT EXISTS `kandidats` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `kategori` ENUM('BEM', 'BPM') NOT NULL,
+    `jurusan_id` INT UNSIGNED DEFAULT NULL,
     `nomor_urut` TINYINT UNSIGNED NOT NULL,
     `nama_calon` VARCHAR(150) NOT NULL,
     `nama_wakil` VARCHAR(150) DEFAULT NULL,
@@ -15,7 +16,8 @@ CREATE TABLE IF NOT EXISTS `kandidats` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_kandidat_kategori_urut` (`kategori`, `nomor_urut`),
-    KEY `idx_kandidat_kategori` (`kategori`)
+    KEY `idx_kandidat_kategori` (`kategori`),
+    KEY `idx_kandidat_jurusan_id` (`jurusan_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tim_sukses` (
