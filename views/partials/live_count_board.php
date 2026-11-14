@@ -4,6 +4,7 @@
  * Menampilkan foto kandidat, Visi & Misi, Flip Counter 3D real-time, dan grafik interaktif.
  */
 require_once BASE_PATH . '/models/kandidat_model.php';
+require_once BASE_PATH . '/models/user_model.php';
 
 $pdo = get_db_connection();
 $kategori = ($kategori ?? 'BEM') === 'BPM' ? 'BPM' : 'BEM';
@@ -11,12 +12,18 @@ $isBpm = ($kategori === 'BPM');
 $pageTitle = 'Live Count ' . $kategori;
 $isPublicParam = (isset($_GET['public']) && $_GET['public'] === '1');
 $isFullScreenLayout = !is_authenticated() || $isPublicParam;
-$liveData = get_live_count_summary($pdo, $kategori);
+$liveCountPublik = get_setting_value($pdo, 'live_count_publik', 'BUKA');
+$isLiveCountHidden = ($liveCountPublik !== 'BUKA' && !is_authenticated());
+$liveData = $isLiveCountHidden
+    ? ['kandidats' => [], 'total_suara_kandidat' => 0, 'total_dpt' => 0, 'partisipasi_persen' => 0]
+    : get_live_count_summary($pdo, $kategori);
 
-$extraScripts = [
-    'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
-    asset_url('js/modules/live_count_chart.js'),
-];
+$extraScripts = $isLiveCountHidden
+    ? []
+    : [
+        asset_url('js/vendor/chart.umd.min.js') . '?v=1',
+        asset_url('js/modules/live_count_chart.js'),
+    ];
 
 $routeParams = $isPublicParam ? ['public' => '1'] : [];
 $bemUrl = route_url('live_count_bem', $routeParams);
@@ -98,6 +105,16 @@ require BASE_PATH . '/views/layouts/header.php';
         </div>
     <?php endif; ?>
 
+    <?php if ($isLiveCountHidden): ?>
+        <section class="card text-center" style="padding:36px 24px;">
+            <div class="mb-2"><span class="badge warn dot">Publikasi Sementara Ditutup</span></div>
+            <h2 class="hero-title" style="font-size:20px;">Hasil Live Count <?= e($kategori) ?> Sedang Disembunyikan</h2>
+            <p class="text-muted mt-2 mb-3">Panitia KPRM sedang menunda publikasi perolehan suara secara terbuka. Silakan cek kembali setelah pengumuman resmi dibuka.</p>
+            <div>
+                <a href="<?= e(route_url('bilik_pemilihan')) ?>" class="btn btn--soft-primary btn--sm">Ke Bilik Pemilihan</a>
+            </div>
+        </section>
+    <?php else: ?>
     <!-- KPI Ringkas + Flip Counter Total Suara -->
     <div class="kpi-grid">
         <div class="kpi-card">
@@ -240,6 +257,7 @@ require BASE_PATH . '/views/layouts/header.php';
             </div>
         </section>
     </div>
+    <?php endif; ?>
 </div>
 
 <!-- Modal Detail Visi & Misi Lengkap (Publik) -->

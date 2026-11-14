@@ -3,11 +3,12 @@
  * MANAJEMEN MAHASISWA (DPT) & HIERARKI KELAS - Adminator 2026 Redesign (Fitur 4)
  * Daftar Kelas berbasis Card Grid & Modal Besar Detail Mahasiswa per Kelas (Super Real-Time).
  */
-require_auth();
+require_role(['superadmin', 'kprm', 'banwasra']);
 require_once BASE_PATH . '/models/mahasiswa_model.php';
 
 $pdo = get_db_connection();
 $pageTitle = 'Data DPT Mahasiswa';
+$canWrite = can_manage_pemira();
 
 $kelasList = get_all_kelas_with_stats($pdo);
 $jurusanList = get_all_jurusans($pdo);
@@ -40,8 +41,12 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <section class="hero">
     <div class="hero-actions">
-        <button type="button" class="btn btn--ghost btn--sm" onclick="openCreateKelasModal()">+ Tambah Kelas</button>
-        <button type="button" class="btn btn--primary btn--sm" onclick="openAddMahasiswaModal(0)">+ Tambah / Import DPT</button>
+        <?php if ($canWrite): ?>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="openCreateKelasModal()">+ Tambah Kelas</button>
+            <button type="button" class="btn btn--primary btn--sm" onclick="openAddMahasiswaModal(0)">+ Tambah / Import DPT</button>
+        <?php else: ?>
+            <span class="badge purple dot">Mode Viewer (Read-Only · Banwasra)</span>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -83,10 +88,11 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <!-- JSON Payload for Real-Time Detail Kelas Modal -->
 <script type="application/json" id="kelasDataPayload"><?= json_encode([
-    'kelas' => $kelasMap,
+    'canWrite'         => $canWrite,
+    'kelas'            => $kelasMap,
     'mahasiswaByKelas' => $mahasiswaByKelas,
-    'actionUrl' => action_url('mahasiswa'),
-    'csrfToken' => csrf_token()
+    'actionUrl'        => $canWrite ? action_url('mahasiswa') : '',
+    'csrfToken'        => $canWrite ? csrf_token() : '',
 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?></script>
 
 <!-- Card Grid Daftar Kelas -->
@@ -142,6 +148,7 @@ require BASE_PATH . '/views/layouts/header.php';
                         <button type="button" class="btn btn--soft-primary btn--xs" style="flex:1;" onclick="openDetailKelasModal(<?= $klId ?>)">
                             Buka Kelas
                         </button>
+                        <?php if ($canWrite): ?>
                         <div class="data-cell-actions">
                             <button type="button" class="btn btn--ghost btn--xs" onclick='openEditKelasModal(<?= json_encode($kl, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>Edit</button>
                             <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" data-confirm="Hapus kelas <?= e($kl['nama_kelas']) ?> beserta seluruh mahasiswa di dalamnya?" style="display:inline;">
@@ -151,6 +158,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Kelas">×</button>
                             </form>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </article>
             <?php endforeach; ?>
@@ -185,16 +193,20 @@ require BASE_PATH . '/views/layouts/header.php';
                     </select>
                 </div>
                 <div class="data-toolbar-right" style="gap:6px;">
-                    <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" style="display:inline;">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="sub_action" value="set_all_hadir_kelas">
-                        <input type="hidden" name="kelas_id" id="dk_checkall_kelas_id" value="0">
-                        <input type="hidden" name="status_hadir" value="1">
-                        <button type="submit" class="btn btn--ghost btn--xs">Check-In Semua</button>
-                    </form>
-                    <button type="button" class="btn btn--primary btn--xs" onclick="openAddMahasiswaModal(window.activeDetailKelasId || 0)">
-                        + Tambah Mahasiswa
-                    </button>
+                    <?php if ($canWrite): ?>
+                        <form action="<?= e(action_url('mahasiswa')) ?>" method="POST" style="display:inline;">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="sub_action" value="set_all_hadir_kelas">
+                            <input type="hidden" name="kelas_id" id="dk_checkall_kelas_id" value="0">
+                            <input type="hidden" name="status_hadir" value="1">
+                            <button type="submit" class="btn btn--ghost btn--xs">Check-In Semua</button>
+                        </form>
+                        <button type="button" class="btn btn--primary btn--xs" onclick="openAddMahasiswaModal(window.activeDetailKelasId || 0)">
+                            + Tambah Mahasiswa
+                        </button>
+                    <?php else: ?>
+                        <span class="badge purple dot">Mode Viewer</span>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -207,11 +219,13 @@ require BASE_PATH . '/views/layouts/header.php';
                             <th>Nama Lengkap</th>
                             <th>Check-In</th>
                             <th>Status Suara</th>
-                            <th class="text-right">Aksi</th>
+                            <?php if ($canWrite): ?>
+                                <th class="text-right">Aksi</th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody id="dkMahasiswaTbody">
-                        <tr><td colspan="5" class="table-empty">Pilih kelas untuk melihat daftar mahasiswa.</td></tr>
+                        <tr><td colspan="<?= $canWrite ? 5 : 4 ?>" class="table-empty">Pilih kelas untuk melihat daftar mahasiswa.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -224,6 +238,7 @@ require BASE_PATH . '/views/layouts/header.php';
     </div>
 </div>
 
+<?php if ($canWrite): ?>
 <!-- Modal Tambah / Import Mahasiswa -->
 <div class="modal-backdrop" id="mahasiswaModal">
     <div class="modal-dialog modal-md">
@@ -380,6 +395,7 @@ require BASE_PATH . '/views/layouts/header.php';
         </form>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 window.activeDetailKelasId = 0;
@@ -437,7 +453,8 @@ function openDetailKelasModal(kelasId, resetFilter = true) {
 
     document.getElementById('dkTitle').textContent = (kl.nama_kelas || '-') + ' · ' + (kl.jurusan || '-');
     document.getElementById('dkSummaryText').textContent = `Semester ${kl.semester || '-'} · ${total} Mahasiswa · ${hadir} Hadir · ${sudah} Sudah Memilih`;
-    document.getElementById('dk_checkall_kelas_id').value = kelasId;
+    const checkAllInput = document.getElementById('dk_checkall_kelas_id');
+    if (checkAllInput) checkAllInput.value = kelasId;
 
     if (resetFilter) {
         const searchEl = document.getElementById('dkSearchInput');
@@ -462,6 +479,7 @@ window.refreshOpenDetailKelasModal = refreshOpenDetailKelasModal;
 function renderDetailKelasRows() {
     const kelasId = window.activeDetailKelasId;
     const payload = getKelasPayload();
+    const canWrite = Boolean(payload.canWrite);
     const list = payload.mahasiswaByKelas?.[kelasId] || [];
     const actionUrl = escapeHtmlStr(payload.actionUrl || '');
     const csrfToken = escapeHtmlStr(payload.csrfToken || '');
@@ -493,7 +511,7 @@ function renderDetailKelasRows() {
     if (!tbody) return;
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="table-empty">${
+        tbody.innerHTML = `<tr><td colspan="${canWrite ? 5 : 4}" class="table-empty">${
             list.length === 0
                 ? 'Belum ada mahasiswa di kelas ini.'
                 : 'Tidak ada mahasiswa yang cocok.'
@@ -514,28 +532,21 @@ function renderDetailKelasRows() {
             status_hadir: m.status_hadir
         }));
 
-        return `
-            <tr class="data-row">
-                <td><span class="data-cell-mono fw-600">${escapeHtmlStr(m.nim)}</span></td>
-                <td><span class="fw-600">${escapeHtmlStr(m.nama_lengkap)}</span></td>
-                <td>
-                    <form action="${actionUrl}" method="POST" style="display:inline;">
-                        <input type="hidden" name="csrf_token" value="${csrfToken}">
-                        <input type="hidden" name="sub_action" value="toggle_hadir">
-                        <input type="hidden" name="id" value="${Number(m.id)}">
-                        <input type="hidden" name="kelas_id" value="${Number(m.kelas_id)}">
-                        <input type="hidden" name="status_hadir" value="${nextHadir}">
-                        <button type="submit" class="badge ${statusHadir ? 'info' : 'neutral'} dot" style="cursor:pointer;border:0;" title="Klik untuk ubah status Check-In">
-                            ${statusHadir ? 'Hadir' : 'Belum'}
-                        </button>
-                    </form>
-                </td>
-                <td>
-                    ${sudahVote
-                        ? `<span class="badge success dot" title="Memilih${escapeHtmlStr(voteTime)}">Sudah Memilih</span>`
-                        : '<span class="badge neutral">Belum</span>'}
-                </td>
-                <td>
+        const checkInCell = canWrite
+            ? `<form action="${actionUrl}" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="${csrfToken}">
+                    <input type="hidden" name="sub_action" value="toggle_hadir">
+                    <input type="hidden" name="id" value="${Number(m.id)}">
+                    <input type="hidden" name="kelas_id" value="${Number(m.kelas_id)}">
+                    <input type="hidden" name="status_hadir" value="${nextHadir}">
+                    <button type="submit" class="badge ${statusHadir ? 'info' : 'neutral'} dot" style="cursor:pointer;border:0;" title="Klik untuk ubah status Check-In">
+                        ${statusHadir ? 'Hadir' : 'Belum'}
+                    </button>
+                </form>`
+            : `<span class="badge ${statusHadir ? 'info' : 'neutral'} dot">${statusHadir ? 'Hadir' : 'Belum'}</span>`;
+
+        const actionCell = canWrite
+            ? `<td>
                     <div class="data-cell-actions">
                         <button type="button" class="btn btn--ghost btn--xs" data-mhs-edit="${mJsonAttr}" onclick="openEditMahasiswaFromBtn(this)">Edit</button>
                         <form action="${actionUrl}" method="POST" data-confirm="Hapus mahasiswa ${escapeHtmlStr(m.nama_lengkap)} (${escapeHtmlStr(m.nim)}) dari DPT?" style="display:inline;">
@@ -546,7 +557,20 @@ function renderDetailKelasRows() {
                             <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Mahasiswa">×</button>
                         </form>
                     </div>
+                </td>`
+            : '';
+
+        return `
+            <tr class="data-row">
+                <td><span class="data-cell-mono fw-600">${escapeHtmlStr(m.nim)}</span></td>
+                <td><span class="fw-600">${escapeHtmlStr(m.nama_lengkap)}</span></td>
+                <td>${checkInCell}</td>
+                <td>
+                    ${sudahVote
+                        ? `<span class="badge success dot" title="Memilih${escapeHtmlStr(voteTime)}">Sudah Memilih</span>`
+                        : '<span class="badge neutral">Belum</span>'}
                 </td>
+                ${actionCell}
             </tr>
         `;
     }).join('');

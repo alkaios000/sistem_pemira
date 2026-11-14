@@ -780,6 +780,292 @@ const PemiraApp = (() => {
 
             requestAnimationFrame(animateNodes);
         }
+
+        // Ambient 3D Shimmering Soft-Blue Plexus Node Network on Login Page (+ Red Error Flash)
+        const authCanvas = document.getElementById('authNodeCanvas');
+        let triggerAuthErrorFlash = () => {};
+        if (authCanvas && authCanvas.getContext) {
+            const actx = authCanvas.getContext('2d');
+            let aw = window.innerWidth;
+            let ah = window.innerHeight;
+            let adpr = Math.min(window.devicePixelRatio || 1, 2);
+            const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            let authNodes = [];
+            let alertFlashStart = -Infinity;
+            let rafActive = !prefersReduced;
+
+            const blueNodePalette = [
+                [96, 165, 250],
+                [59, 130, 246],
+                [56, 189, 248],
+                [147, 197, 253]
+            ];
+            const redNodePalette = [
+                [248, 113, 113],
+                [239, 68, 68],
+                [220, 38, 38],
+                [252, 165, 165]
+            ];
+
+            function mixRgbStr(blueRgb, redRgb, mix) {
+                if (mix <= 0.001) return `${blueRgb[0]}, ${blueRgb[1]}, ${blueRgb[2]}`;
+                const r = Math.round(blueRgb[0] + (redRgb[0] - blueRgb[0]) * mix);
+                const g = Math.round(blueRgb[1] + (redRgb[1] - blueRgb[1]) * mix);
+                const b = Math.round(blueRgb[2] + (redRgb[2] - blueRgb[2]) * mix);
+                return `${r}, ${g}, ${b}`;
+            }
+
+            function getErrorRedMix(nowTs) {
+                if (!Number.isFinite(alertFlashStart)) return 0;
+                const elapsed = nowTs - alertFlashStart;
+                if (elapsed < 0 || elapsed >= 2200) {
+                    alertFlashStart = -Infinity;
+                    return 0;
+                }
+                if (elapsed < 160) {
+                    const k = elapsed / 160;
+                    return 1 - Math.pow(1 - k, 3);
+                }
+                if (elapsed < 650) {
+                    return 1;
+                }
+                const k = (elapsed - 650) / 1550;
+                return 0.5 * (1 + Math.cos(Math.PI * k));
+            }
+
+            triggerAuthErrorFlash = () => {
+                alertFlashStart = performance.now();
+                if (!rafActive) {
+                    rafActive = true;
+                    requestAnimationFrame(drawAuthNodes);
+                }
+            };
+
+            function createAuthNodes() {
+                const targetCount = Math.min(68, Math.max(26, Math.floor((aw * ah) / 22000)));
+                authNodes = [];
+                for (let i = 0; i < targetCount; i++) {
+                    const depth = 0.42 + Math.random() * 0.58;
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = (0.09 + Math.random() * 0.18) * (0.65 + depth * 0.55);
+                    const pIdx = i % blueNodePalette.length;
+                    authNodes.push({
+                        x: Math.random() * aw,
+                        y: Math.random() * ah,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        depth,
+                        r: (1.7 + Math.random() * 1.9) * (0.65 + depth * 0.55),
+                        alpha: (0.28 + Math.random() * 0.24) * (0.55 + depth * 0.45),
+                        blueTone: blueNodePalette[pIdx],
+                        redTone: redNodePalette[pIdx]
+                    });
+                }
+                authNodes.sort((a, b) => a.depth - b.depth);
+            }
+
+            function resizeAuthCanvas() {
+                aw = window.innerWidth;
+                ah = window.innerHeight;
+                adpr = Math.min(window.devicePixelRatio || 1, 2);
+                authCanvas.width = aw * adpr;
+                authCanvas.height = ah * adpr;
+                authCanvas.style.width = aw + 'px';
+                authCanvas.style.height = ah + 'px';
+                actx.setTransform(adpr, 0, 0, adpr, 0, 0);
+                createAuthNodes();
+            }
+
+            resizeAuthCanvas();
+            window.addEventListener('resize', resizeAuthCanvas);
+
+            function drawAuthNodes(ts) {
+                const nowTs = typeof ts === 'number' ? ts : performance.now();
+                const t = nowTs * 0.001;
+                const redMix = getErrorRedMix(nowTs);
+                const alphaBoost = 1 + redMix * 0.28;
+
+                actx.clearRect(0, 0, aw, ah);
+                const maxLinkDist = 165;
+
+                if (!prefersReduced) {
+                    for (let i = 0; i < authNodes.length; i++) {
+                        const n = authNodes[i];
+                        n.x += n.vx;
+                        n.y += n.vy;
+
+                        if (n.x < -12) n.x = aw + 12;
+                        else if (n.x > aw + 12) n.x = -12;
+                        if (n.y < -12) n.y = ah + 12;
+                        else if (n.y > ah + 12) n.y = -12;
+                    }
+                }
+
+                const edgeEndRgb = mixRgbStr([96, 165, 250], [248, 113, 113], redMix);
+                const edgeMidRgb = mixRgbStr([59, 130, 246], [239, 68, 68], redMix);
+                const edgePeakRgb = mixRgbStr([224, 242, 254], [254, 226, 226], redMix);
+                const edgeAltRgb = mixRgbStr([56, 189, 248], [244, 63, 94], redMix);
+                const sparkHaloRgb = mixRgbStr([186, 230, 253], [254, 202, 202], redMix);
+
+                // Soft-blue (or red flash on error) 3D connecting edges with traveling gleam
+                for (let i = 0; i < authNodes.length; i++) {
+                    const a = authNodes[i];
+                    for (let j = i + 1; j < authNodes.length; j++) {
+                        const b = authNodes[j];
+                        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+                        if (dist < maxLinkDist) {
+                            const avgDepth = (a.depth + b.depth) * 0.5;
+                            const prox = 1 - dist / maxLinkDist;
+                            const baseAlpha = Math.min(0.85, prox * (0.28 + avgDepth * 0.22) * alphaBoost);
+                            const edgeWave = 0.5 + 0.5 * Math.sin(t * 2.1 + i * 0.83 + j * 1.29);
+                            const shimCenter = Math.max(0.14, Math.min(0.86, ((t * 0.36 + (i * 0.17 + j * 0.23)) % 1)));
+
+                            const grad = actx.createLinearGradient(a.x, a.y, b.x, b.y);
+                            const s0 = Math.max(0.02, shimCenter - 0.14);
+                            const s1 = Math.min(0.98, shimCenter + 0.14);
+                            const peakAlpha = Math.min(0.92, baseAlpha + prox * edgeWave * 0.36);
+
+                            grad.addColorStop(0, `rgba(${edgeEndRgb}, ${baseAlpha.toFixed(3)})`);
+                            grad.addColorStop(s0, `rgba(${edgeMidRgb}, ${Math.min(0.82, baseAlpha * 1.28).toFixed(3)})`);
+                            grad.addColorStop(shimCenter, `rgba(${edgePeakRgb}, ${peakAlpha.toFixed(3)})`);
+                            grad.addColorStop(s1, `rgba(${edgeAltRgb}, ${Math.min(0.82, baseAlpha * 1.22).toFixed(3)})`);
+                            grad.addColorStop(1, `rgba(${edgeEndRgb}, ${baseAlpha.toFixed(3)})`);
+
+                            actx.beginPath();
+                            actx.moveTo(a.x, a.y);
+                            actx.lineTo(b.x, b.y);
+                            actx.strokeStyle = grad;
+                            actx.lineWidth = (0.95 + avgDepth * 0.65) * (1 + redMix * 0.25);
+                            actx.stroke();
+
+                            // Subtle gleaming spark traveling along prominent edges
+                            if (edgeWave > 0.62 && prox > 0.26) {
+                                const gx = a.x + (b.x - a.x) * shimCenter;
+                                const gy = a.y + (b.y - a.y) * shimCenter;
+                                const sparkAlpha = (edgeWave - 0.62) * 1.75 * prox;
+                                actx.beginPath();
+                                actx.arc(gx, gy, 2.2 + avgDepth * 1.1, 0, Math.PI * 2);
+                                actx.fillStyle = `rgba(${sparkHaloRgb}, ${(sparkAlpha * 0.48).toFixed(3)})`;
+                                actx.fill();
+
+                                actx.beginPath();
+                                actx.arc(gx, gy, 1.05, 0, Math.PI * 2);
+                                actx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.95, sparkAlpha).toFixed(3)})`;
+                                actx.fill();
+                            }
+                        }
+                    }
+                }
+
+                // Solid soft-blue (or red flash on error) nodes with subtle soft halo
+                for (let i = 0; i < authNodes.length; i++) {
+                    const n = authNodes[i];
+                    const nodeRgb = mixRgbStr(n.blueTone, n.redTone, redMix);
+
+                    actx.beginPath();
+                    actx.arc(n.x, n.y, n.r + 2.4 + redMix * 1.2, 0, Math.PI * 2);
+                    actx.fillStyle = `rgba(${nodeRgb}, ${Math.min(0.35, n.alpha * 0.16 * alphaBoost).toFixed(3)})`;
+                    actx.fill();
+
+                    actx.beginPath();
+                    actx.arc(n.x, n.y, n.r + redMix * 0.35, 0, Math.PI * 2);
+                    actx.fillStyle = `rgba(${nodeRgb}, ${Math.min(0.92, (n.alpha + 0.14) * alphaBoost).toFixed(3)})`;
+                    actx.fill();
+                }
+
+                if (!prefersReduced || Number.isFinite(alertFlashStart)) {
+                    requestAnimationFrame(drawAuthNodes);
+                } else {
+                    rafActive = false;
+                }
+            }
+
+            requestAnimationFrame(drawAuthNodes);
+        }
+
+        // No-Refresh Login Submission dengan Flash Node Merah
+        const authLoginForm = document.getElementById('authLoginForm');
+        const authErrorMsg = document.getElementById('authErrorMsg');
+        if (authLoginForm) {
+            const showAuthError = msg => {
+                if (authErrorMsg) {
+                    authErrorMsg.textContent = msg || 'Incorrect password';
+                    authErrorMsg.classList.add('is-visible');
+                }
+                authLoginForm.classList.remove('is-shaking');
+                void authLoginForm.offsetWidth;
+                authLoginForm.classList.add('is-error', 'is-shaking');
+                triggerAuthErrorFlash();
+                const pwEl = document.getElementById('password');
+                if (pwEl) {
+                    pwEl.focus();
+                    pwEl.select();
+                }
+            };
+
+            authLoginForm.querySelectorAll('input').forEach(inp => {
+                inp.addEventListener('input', () => {
+                    authLoginForm.classList.remove('is-error');
+                });
+            });
+
+            if (authErrorMsg && authErrorMsg.classList.contains('is-visible')) {
+                triggerAuthErrorFlash();
+            }
+
+            authLoginForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                const submitBtn = authLoginForm.querySelector('button[type="submit"]');
+                if (submitBtn && submitBtn.disabled) return;
+                if (submitBtn) submitBtn.disabled = true;
+
+                let redirecting = false;
+                try {
+                    const res = await fetch(authLoginForm.action, {
+                        method: 'POST',
+                        body: new FormData(authLoginForm),
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+
+                    if (res.status === 419) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    const json = await res.json();
+                    if (json && json.data && json.data.csrf_token) {
+                        const csrfInp = authLoginForm.querySelector('input[name="csrf_token"]');
+                        if (csrfInp) csrfInp.value = json.data.csrf_token;
+                        if (window.PEMIRA_CONFIG) window.PEMIRA_CONFIG.csrfToken = json.data.csrf_token;
+                    }
+
+                    if (json && json.success && json.data && json.data.redirect_url) {
+                        redirecting = true;
+                        window.location.href = json.data.redirect_url;
+                        return;
+                    }
+
+                    showAuthError((json && json.message) ? json.message : 'Incorrect password');
+                } catch (_) {
+                    showAuthError('Incorrect password');
+                } finally {
+                    if (submitBtn && !redirecting) {
+                        submitBtn.disabled = false;
+                    }
+                }
+            });
+        }
+
+        // Toggle visibility password tanpa label
+        document.querySelectorAll('[data-toggle-password]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const input = document.getElementById(btn.getAttribute('data-toggle-password'));
+                if (!input) return;
+                const isHidden = input.type === 'password';
+                input.type = isHidden ? 'text' : 'password';
+                btn.style.color = isHidden ? 'var(--primary)' : '';
+            });
+        });
     });
 
     return { openModal, closeModal, confirmAction, toast, initDataTables, syncCurrentPage, broadcastSync };

@@ -329,9 +329,15 @@ function fetchLiveCountData() {
     fetch(`${window.PEMIRA_CONFIG.baseUrl}/index.php?action=live_count&kategori=${encodeURIComponent(kategori)}&_t=${Date.now()}`, {
         headers: { 'Cache-Control': 'no-cache' }
     })
-        .then(res => res.json())
         .then(res => {
-            if (!res.success || !res.data) return;
+            if (res.status === 403) {
+                window.location.reload();
+                return null;
+            }
+            return res.json();
+        })
+        .then(res => {
+            if (!res || !res.success || !res.data) return;
             const d = res.data;
             const cands = d.kandidats || [];
 

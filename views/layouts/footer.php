@@ -22,7 +22,7 @@ $extraScripts = $extraScripts ?? [];
 
 <?php require BASE_PATH . '/views/layouts/modal_global.php'; ?>
 
-<script src="<?= e(asset_url('js/app.js')) ?>?v=13"></script>
+<script src="<?= e(asset_url('js/app.js')) ?>?v=20"></script>
 <?php foreach ($extraScripts as $scriptPath):
     $isLocalScript = str_starts_with($scriptPath, base_url()) || !preg_match('#^https?://#i', $scriptPath);
     $verSuffix = ($isLocalScript && !str_contains($scriptPath, '?')) ? '?v=14' : '';

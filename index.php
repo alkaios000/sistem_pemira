@@ -26,6 +26,7 @@ $allowed_actions = [
     'voting'     => BASE_PATH . '/app/controllers/voting_action.php',
     'log'        => BASE_PATH . '/app/controllers/log_action.php',
     'live_count' => BASE_PATH . '/app/controllers/live_count_action.php',
+    'user'       => BASE_PATH . '/app/controllers/user_action.php',
 ];
 
 if (isset($_GET['action']) && $_GET['action'] !== '') {
@@ -49,6 +50,8 @@ $allowed_pages = [
     'manajemen_bilik'     => BASE_PATH . '/views/pages/portal_qr.php',
     'manajemen_mahasiswa' => BASE_PATH . '/views/pages/manajemen_mahasiswa.php',
     'manajemen_jurusan'   => BASE_PATH . '/views/pages/manajemen_jurusan.php',
+    'manajemen_user'      => BASE_PATH . '/views/pages/manajemen_user.php',
+    'profil_akun'         => BASE_PATH . '/views/pages/profil_akun.php',
     'log_keamanan'        => BASE_PATH . '/views/pages/log_keamanan.php',
     'portal_qr'           => BASE_PATH . '/views/pages/portal_qr.php',
     'bilik_pemilihan'     => BASE_PATH . '/views/pages/bilik_pemilihan.php',

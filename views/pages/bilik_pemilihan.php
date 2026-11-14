@@ -52,7 +52,7 @@ if (isset($_GET['step']) && in_array((int)$_GET['step'], [2, 3], true) && !$acti
 }
 
 $extraScripts = [
-    'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
+    asset_url('js/vendor/html5-qrcode.min.js') . '?v=1',
     asset_url('js/modules/voting_client.js')
 ];
 
@@ -81,10 +81,11 @@ require BASE_PATH . '/views/layouts/header.php';
         </div>
 
         <div class="d-flex align-center gap-2">
-            <a href="<?= e(route_url('portal_qr')) ?>" class="btn btn--soft-primary btn--xs">Layar Portal QR</a>
             <?php if (is_authenticated()): ?>
+                <a href="<?= e(route_url('portal_qr')) ?>" class="btn btn--soft-primary btn--xs">Layar Portal QR</a>
                 <a href="<?= e(route_url('dashboard')) ?>" class="btn btn--ghost btn--xs">Panel Admin</a>
             <?php else: ?>
+                <a href="<?= e(route_url('live_count_bem')) ?>" class="btn btn--ghost btn--xs">Live Count</a>
                 <a href="<?= e(route_url('login')) ?>" class="btn btn--ghost btn--xs">Login Panitia</a>
             <?php endif; ?>
         </div>

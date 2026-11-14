@@ -5,9 +5,14 @@
 
 require_once BASE_PATH . '/models/kandidat_model.php';
 require_once BASE_PATH . '/models/jurusan_model.php';
+require_once BASE_PATH . '/models/log_model.php';
 
-require_auth();
-verify_csrf_request();
+$is_ajax = is_ajax_request();
+require_role(['superadmin', 'kprm'], $is_ajax);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirect(route_url('manajemen_kandidat'));
+}
+verify_csrf_request($is_ajax);
 
 $pdo = get_db_connection();
 $sub_action = $_POST['sub_action'] ?? '';
@@ -95,10 +100,22 @@ try {
         ];
 
         if ($sub_action === 'create') {
-            create_kandidat($pdo, $payload, $timses_list);
+            $new_id = create_kandidat($pdo, $payload, $timses_list);
+            record_admin_audit_log(
+                $pdo,
+                'KANDIDAT_CREATE',
+                'Penambahan Kandidat Baru',
+                "Operator {$_SESSION['username']} menambahkan kandidat {$kategori} No. {$nomor_urut} ({$nama_calon})."
+            );
             set_flash('success', "Kandidat {$kategori} Nomor Urut {$nomor_urut} ({$nama_calon}) berhasil ditambahkan.");
         } else {
             update_kandidat($pdo, $id, $payload, $timses_list);
+            record_admin_audit_log(
+                $pdo,
+                'KANDIDAT_UPDATE',
+                'Perubahan Data Kandidat',
+                "Operator {$_SESSION['username']} memperbarui kandidat #{$id} {$kategori} No. {$nomor_urut} ({$nama_calon})."
+            );
             set_flash('success', "Data Kandidat {$kategori} Nomor Urut {$nomor_urut} ({$nama_calon}) berhasil diperbarui.");
         }
 
@@ -109,10 +126,20 @@ try {
         $id = (int) ($_POST['id'] ?? 0);
         $existing = find_kandidat_by_id($pdo, $id);
         if ($existing) {
+            if ((int) ($existing['jumlah_suara'] ?? 0) > 0) {
+                set_flash('danger', "Kandidat {$existing['nama_calon']} tidak dapat dihapus karena telah memiliki {$existing['jumlah_suara']} suara sah tercatat.");
+                redirect(route_url('manajemen_kandidat', ['kategori' => $existing['kategori']]));
+            }
             if (!empty($existing['foto_path'])) {
                 delete_uploaded_file($existing['foto_path']);
             }
             delete_kandidat($pdo, $id);
+            record_admin_audit_log(
+                $pdo,
+                'KANDIDAT_DELETE',
+                'Penghapusan Data Kandidat',
+                "Operator {$_SESSION['username']} menghapus kandidat {$existing['kategori']} No. {$existing['nomor_urut']} ({$existing['nama_calon']})."
+            );
             set_flash('success', 'Data kandidat beserta daftar tim suksesnya berhasil dihapus.');
             redirect(route_url('manajemen_kandidat', ['kategori' => $existing['kategori']]));
         }

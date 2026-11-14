@@ -4,18 +4,23 @@
  * Menampilkan QR Code Dinamis per Bilik Suara yang berotasi otomatis & terkunci seketika saat di-scan,
  * sekaligus menyediakan kontrol penuh Manajemen Bilik Suara secara real-time.
  */
+require_role(['superadmin', 'kprm', 'banwasra']);
 require_once BASE_PATH . '/models/bilik_model.php';
 require_once BASE_PATH . '/models/user_model.php';
 
 $pdo = get_db_connection();
 $pageTitle = 'Portal QR Bilik';
-$isAdminAuth = is_authenticated();
-$isFullScreenLayout = !$isAdminAuth;
+$active_menu = 'portal_qr';
+$canWrite = can_manage_pemira();
+$canViewLogs = can_view_logs();
+$excludeSuperadminLogs = is_banwasra();
+$isFullScreenLayout = false;
 
-$bilikList = get_all_biliks($pdo);
-$selectedBooth = isset($_GET['booth']) ? (int)$_GET['booth'] : (int)($bilikList[0]['nomor_bilik'] ?? 1);
+$bilikList = get_all_biliks_sanitized($pdo, $canViewLogs, $excludeSuperadminLogs);
+$selectedBooth = isset($_GET['booth']) ? (int) $_GET['booth'] : (int) ($bilikList[0]['nomor_bilik'] ?? 1);
 $globalPortal = get_setting_value($pdo, 'status_portal_global', 'BUKA');
 $wajibCheckin = get_setting_value($pdo, 'wajib_checkin_panitia', '0');
+$liveCountPublik = get_setting_value($pdo, 'live_count_publik', 'BUKA');
 
 $totalBilik = count($bilikList);
 $bilikIdle = 0;
@@ -29,26 +34,12 @@ foreach ($bilikList as $b) {
 }
 
 $extraScripts = [
-    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-    asset_url('js/modules/portal_qr.js')
+    asset_url('js/vendor/qrcode.min.js') . '?v=1',
+    asset_url('js/modules/portal_qr.js') . '?v=2',
 ];
 
 require BASE_PATH . '/views/layouts/header.php';
 ?>
-
-<?php if ($isFullScreenLayout): ?>
-<header class="lc-standalone-topbar">
-    <div class="d-flex align-center gap-2">
-        <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img-sm">
-        <span class="fw-700">Sistem PEMIRA · Portal QR Bilik Suara</span>
-    </div>
-    <div class="d-flex align-center gap-2">
-        <a href="<?= e(route_url('bilik_pemilihan')) ?>" class="btn btn--soft-primary btn--xs">Bilik Pemilihan</a>
-        <a href="<?= e(route_url('login')) ?>" class="btn btn--ghost btn--xs">Login Panitia</a>
-    </div>
-</header>
-<div class="content">
-<?php endif; ?>
 
 <section class="hero" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
     <div class="d-flex align-center gap-2 flex-wrap">
@@ -59,12 +50,23 @@ require BASE_PATH . '/views/layouts/header.php';
                 </option>
             <?php endforeach; ?>
         </select>
-        <button type="button" class="btn btn--soft-primary btn--sm" onclick="forceRotateBoothToken()">Rotasi Token Baru</button>
+        <?php if ($canWrite): ?>
+            <button type="button" class="btn btn--soft-primary btn--sm" onclick="forceRotateBoothToken()">Rotasi Token Baru</button>
+        <?php endif; ?>
     </div>
 
-    <?php if ($isAdminAuth): ?>
+    <?php if ($canWrite): ?>
     <div class="hero-actions">
         <span id="bilikHeroGlobalControls" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <form action="<?= e(action_url('bilik')) ?>" method="POST" style="display:inline;">
+                <?= csrf_field() ?>
+                <input type="hidden" name="sub_action" value="toggle_live_count_publik">
+                <input type="hidden" name="live_count_publik" value="<?= $liveCountPublik === 'BUKA' ? 'TUTUP' : 'BUKA' ?>">
+                <button type="submit" class="btn <?= $liveCountPublik === 'BUKA' ? 'btn--ghost' : 'btn--soft-warning' ?> btn--sm">
+                    Live Count Publik: <?= $liveCountPublik === 'BUKA' ? 'Terbuka' : 'Tertutup' ?>
+                </button>
+            </form>
+
             <form action="<?= e(action_url('bilik')) ?>" method="POST" style="display:inline;">
                 <?= csrf_field() ?>
                 <input type="hidden" name="sub_action" value="toggle_wajib_checkin">
@@ -86,10 +88,20 @@ require BASE_PATH . '/views/layouts/header.php';
 
         <button type="button" class="btn btn--primary btn--sm" onclick="openCreateBilikModal()">+ Tambah Bilik</button>
     </div>
+    <?php else: ?>
+    <div class="hero-actions">
+        <span class="badge purple dot">Mode Viewer (Read-Only · Banwasra)</span>
+        <span class="badge <?= $globalPortal === 'BUKA' ? 'success' : 'danger' ?> dot">Portal <?= e($globalPortal) ?></span>
+    </div>
     <?php endif; ?>
 </section>
 
-<div class="qr-layout" id="portalQrRoot" data-active-booth="<?= (int)$selectedBooth ?>" data-is-admin="<?= $isAdminAuth ? '1' : '0' ?>">
+<div class="qr-layout"
+     id="portalQrRoot"
+     data-active-booth="<?= (int)$selectedBooth ?>"
+     data-is-admin="<?= $canWrite ? '1' : '0' ?>"
+     data-can-write="<?= $canWrite ? '1' : '0' ?>"
+     data-can-view-logs="<?= $canViewLogs ? '1' : '0' ?>">
     <!-- Kolom Kiri: Layar QR Code Bilik Aktif -->
     <div class="card">
         <div class="card-head">
@@ -164,9 +176,9 @@ require BASE_PATH . '/views/layouts/header.php';
                         <th>Bilik</th>
                         <th>Nama Bilik</th>
                         <th>Status</th>
-                        <th>Token & Sesi Aktif</th>
-                        <th>Suara & Fraud</th>
-                        <?php if ($isAdminAuth): ?>
+                        <th>Token &amp; Sesi Aktif</th>
+                        <th><?= $canViewLogs ? 'Suara &amp; Fraud' : 'Suara Masuk' ?></th>
+                        <?php if ($canWrite): ?>
                             <th class="text-right">Kontrol Aksi</th>
                         <?php endif; ?>
                     </tr>
@@ -176,8 +188,8 @@ require BASE_PATH . '/views/layouts/header.php';
                         <?php
                         $st = ($globalPortal !== 'BUKA') ? 'CLOSED' : $b['status_bilik'];
                         $isSel = ((int)$b['nomor_bilik'] === $selectedBooth);
-                        $tokShort = !empty($b['current_token']) ? strtoupper(substr((string)$b['current_token'], 0, 10)) . '...' : '-';
-                        $remLock = ($st === 'IN_USE' && !empty($b['locked_until'])) ? max(0, strtotime($b['locked_until']) - time()) : 0;
+                        $tokShort = !empty($b['token_hint']) ? strtoupper((string)$b['token_hint']) : '-';
+                        $remLock = (int)($b['remaining_lock_seconds'] ?? 0);
                         $bJson = json_encode($b, JSON_HEX_APOS | JSON_HEX_QUOT);
                         ?>
                         <tr class="data-row <?= $isSel ? 'is-selected' : '' ?>" data-booth-num="<?= (int)$b['nomor_bilik'] ?>" style="cursor:pointer;" title="Klik baris untuk menampilkan QR bilik ini">
@@ -198,7 +210,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 <div class="data-cell-mono fw-600"><?= e($tokShort) ?></div>
                                 <?php if ($st === 'IN_USE'): ?>
                                     <div class="mono" style="font-size:10.5px;color:var(--primary);">
-                                        NIM: <?= e($b['active_nim'] ?: 'Verifikasi...') ?> · <?= (int)$remLock ?>s
+                                        NIM: <?= e($b['active_nim_masked'] ?: 'Verifikasi...') ?> · <?= (int)$remLock ?>s
                                     </div>
                                 <?php elseif ($st === 'IDLE'): ?>
                                     <div class="text-muted mono" style="font-size:10.5px;">Rotasi Otomatis 8s</div>
@@ -209,12 +221,12 @@ require BASE_PATH . '/views/layouts/header.php';
                             <td>
                                 <div class="d-flex align-center gap-2">
                                     <span class="data-cell-mono fw-600"><?= number_format((int)$b['total_suara_bilik']) ?> suara</span>
-                                    <?php if ((int)$b['total_fraud_bilik'] > 0): ?>
+                                    <?php if ($canViewLogs && (int)$b['total_fraud_bilik'] > 0): ?>
                                         <span class="badge danger"><?= (int)$b['total_fraud_bilik'] ?> Fraud</span>
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <?php if ($isAdminAuth): ?>
+                            <?php if ($canWrite): ?>
                             <td class="text-right">
                                 <div class="data-cell-actions">
                                     <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Reset token QR dan lepas kunci sesi bilik ini?">
@@ -234,7 +246,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                             <?= $b['status_bilik'] === 'CLOSED' ? 'Buka' : 'Tutup' ?>
                                         </button>
                                     </form>
-                                    <button type="button" class="btn btn--ghost btn--xs" onclick='openEditBilikModal(<?= $bJson ?>)'>Edit</button>
+                                    <button type="button" class="btn btn--ghost btn--xs btn-edit-bilik" data-bilik-edit="<?= e($bJson) ?>">Edit</button>
                                     <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Hapus bilik suara ini?">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="sub_action" value="delete_bilik">
@@ -252,7 +264,7 @@ require BASE_PATH . '/views/layouts/header.php';
     </div>
 </div>
 
-<?php if ($isAdminAuth): ?>
+<?php if ($canWrite): ?>
 <!-- Modal Form Tambah / Edit Bilik Suara -->
 <div class="modal-backdrop" id="bilikModal">
     <div class="modal-dialog modal-sm">

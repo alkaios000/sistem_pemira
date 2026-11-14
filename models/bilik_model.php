@@ -44,6 +44,77 @@ function get_all_biliks(PDO $pdo): array
 }
 
 /**
+ * Mengambil daftar bilik suara yang sudah disanitasi untuk respons JSON / polling / UI publik.
+ * Tidak pernah mengekspos secret token (current_token, previous_token, active_session_token)
+ * maupun identifier perangkat mentah atau NIM lengkap pemilih aktif.
+ */
+function get_all_biliks_sanitized(
+    PDO $pdo,
+    bool $include_fraud_count = true,
+    bool $exclude_superadmin_fraud = false
+): array {
+    release_expired_bilik_locks($pdo);
+
+    $fraud_expr = '0 AS total_fraud_bilik';
+    $join_sql = '';
+    if ($include_fraud_count) {
+        $superadmin_filter = $exclude_superadmin_fraud
+            ? ' AND (l.actor_role IS NULL OR l.actor_role <> "superadmin")'
+            : '';
+        $fraud_expr = 'COALESCE(SUM(CASE WHEN l.status_log = "FRAUD"' . $superadmin_filter . ' THEN 1 ELSE 0 END), 0) AS total_fraud_bilik';
+        $join_sql = 'LEFT JOIN audit_logs l ON l.bilik_id = b.id';
+    }
+
+    $stmt = $pdo->query("
+        SELECT
+            b.id,
+            b.nomor_bilik,
+            b.nama_bilik,
+            b.lokasi_bilik,
+            b.status_bilik,
+            b.current_token,
+            b.token_generated_at,
+            b.active_nim,
+            b.locked_until,
+            b.last_vote_at,
+            b.total_suara_bilik,
+            b.created_at,
+            {$fraud_expr}
+        FROM bilik_suaras b
+        {$join_sql}
+        GROUP BY
+            b.id, b.nomor_bilik, b.nama_bilik, b.lokasi_bilik, b.status_bilik,
+            b.current_token, b.token_generated_at, b.active_nim,
+            b.locked_until, b.last_vote_at, b.total_suara_bilik, b.created_at
+        ORDER BY b.nomor_bilik ASC
+    ");
+    $rows = $stmt->fetchAll();
+    $now = time();
+
+    return array_map(static function (array $row) use ($now, $include_fraud_count): array {
+        $locked_ts = !empty($row['locked_until']) ? strtotime((string) $row['locked_until']) : false;
+        $remaining = ($locked_ts && $locked_ts > $now) ? ($locked_ts - $now) : 0;
+
+        return [
+            'id'                     => (int) $row['id'],
+            'nomor_bilik'            => (int) $row['nomor_bilik'],
+            'nama_bilik'             => $row['nama_bilik'],
+            'lokasi_bilik'           => $row['lokasi_bilik'],
+            'status_bilik'           => $row['status_bilik'],
+            'token_hint'             => !empty($row['current_token']) ? substr(hash('sha256', (string) $row['current_token']), 0, 8) : null,
+            'token_generated_at'     => $row['token_generated_at'],
+            'active_nim_masked'      => function_exists('mask_nim') ? mask_nim($row['active_nim'] ?? null) : null,
+            'locked_until'           => $row['locked_until'],
+            'remaining_lock_seconds' => $remaining,
+            'last_vote_at'           => $row['last_vote_at'],
+            'total_suara_bilik'      => (int) $row['total_suara_bilik'],
+            'total_fraud_bilik'      => $include_fraud_count ? (int) $row['total_fraud_bilik'] : 0,
+            'created_at'             => $row['created_at'],
+        ];
+    }, $rows);
+}
+
+/**
  * Mencari bilik suara berdasarkan ID
  */
 function find_bilik_by_id(PDO $pdo, int $id): ?array

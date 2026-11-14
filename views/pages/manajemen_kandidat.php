@@ -2,11 +2,12 @@
 /**
  * MANAJEMEN KANDIDAT & TIMSES - Adminator 2026 Redesign (Fitur 1)
  */
-require_auth();
+require_role(['superadmin', 'kprm', 'banwasra']);
 require_once BASE_PATH . '/models/kandidat_model.php';
 
 $pdo = get_db_connection();
 $pageTitle = 'Kandidat & Timses';
+$canWrite = can_manage_pemira();
 $kandidatBem = get_kandidats_by_kategori($pdo, 'BEM');
 $kandidatBpm = get_kandidats_by_kategori($pdo, 'BPM');
 $jurusanList = get_all_jurusans($pdo);
@@ -25,9 +26,13 @@ require BASE_PATH . '/views/layouts/header.php';
         </button>
     </div>
     <div class="hero-actions">
-        <button type="button" class="btn btn--primary btn--sm" id="btnAddKandidatActive" onclick="openCreateKandidatModal(window.currentKandidatTab)">
-            + Tambah Kandidat <?= e($activeKategori) ?>
-        </button>
+        <?php if ($canWrite): ?>
+            <button type="button" class="btn btn--primary btn--sm" id="btnAddKandidatActive" onclick="openCreateKandidatModal(window.currentKandidatTab)">
+                + Tambah Kandidat <?= e($activeKategori) ?>
+            </button>
+        <?php else: ?>
+            <span class="badge purple dot">Mode Viewer (Read-Only · Banwasra)</span>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -69,6 +74,7 @@ require BASE_PATH . '/views/layouts/header.php';
                         <button type="button" class="btn btn--soft-primary btn--xs" style="flex:1;" data-kand-id="<?= (int)$k['id'] ?>" data-kand-json='<?= $kJson ?>' onclick='openDetailKandidatModal(<?= $kJson ?>)'>
                             Detail Visi & Timses
                         </button>
+                        <?php if ($canWrite): ?>
                         <div class="data-cell-actions">
                             <button type="button" class="btn btn--ghost btn--xs" onclick='openEditKandidatModal(<?= $kJson ?>)'>Edit</button>
                             <form action="<?= e(action_url('kandidat')) ?>" method="POST" data-confirm="Hapus kandidat ini beserta tim suksesnya?">
@@ -79,6 +85,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Kandidat">×</button>
                             </form>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -122,6 +129,7 @@ require BASE_PATH . '/views/layouts/header.php';
                         <button type="button" class="btn btn--soft-primary btn--xs" style="flex:1;" data-kand-id="<?= (int)$k['id'] ?>" data-kand-json='<?= $kJson ?>' onclick='openDetailKandidatModal(<?= $kJson ?>)'>
                             Detail Visi & Timses
                         </button>
+                        <?php if ($canWrite): ?>
                         <div class="data-cell-actions">
                             <button type="button" class="btn btn--ghost btn--xs" onclick='openEditKandidatModal(<?= $kJson ?>)'>Edit</button>
                             <form action="<?= e(action_url('kandidat')) ?>" method="POST" data-confirm="Hapus kandidat ini beserta tim suksesnya?">
@@ -132,6 +140,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Kandidat">×</button>
                             </form>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -206,6 +215,7 @@ require BASE_PATH . '/views/layouts/header.php';
 </div>
 
 <!-- Modal Form Input/Edit Kandidat (3 Bagian Kiri-Tengah-Kanan: Data Pribadi | Visi & Misi | Tim Sukses) -->
+<?php if ($canWrite): ?>
 <div class="modal-backdrop" id="kandidatModal">
     <div class="modal-dialog modal-xl">
         <div class="modal-head">
@@ -310,6 +320,7 @@ require BASE_PATH . '/views/layouts/header.php';
         </form>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 window.currentKandidatTab = '<?= e($activeKategori) ?>';

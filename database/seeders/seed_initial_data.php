@@ -10,27 +10,50 @@ function run_initial_seeder(PDO $pdo): void
     require_once BASE_PATH . '/models/jurusan_model.php';
     ensure_jurusans_ready($pdo);
 
-    // 1. Seed Pengguna Admin & Panitia
+    // 1. Seed Pengguna 3 Role (Superadmin, KPRM, BANWASRA)
     $stmt_check_user = $pdo->query('SELECT COUNT(*) FROM users');
     if ((int) $stmt_check_user->fetchColumn() === 0) {
         $stmt_user = $pdo->prepare('
-            INSERT INTO users (username, nama_lengkap, password_hash, role)
-            VALUES (:username, :nama_lengkap, :password_hash, :role)
+            INSERT INTO users (username, nama_lengkap, password_hash, role, is_active)
+            VALUES (:username, :nama_lengkap, :password_hash, :role, 1)
         ');
 
         $stmt_user->execute([
-            ':username'      => 'admin',
-            ':nama_lengkap'  => 'Administrator KPU PEMIRA',
-            ':password_hash' => password_hash('admin123', PASSWORD_BCRYPT),
-            ':role'          => 'admin',
+            ':username'      => 'superadmin',
+            ':nama_lengkap'  => 'Superadmin Sistem PEMIRA',
+            ':password_hash' => password_hash('Pemira@Super2026!', PASSWORD_BCRYPT),
+            ':role'          => 'superadmin',
         ]);
 
         $stmt_user->execute([
-            ':username'      => 'panitia',
-            ':nama_lengkap'  => 'Panitia Pengawas TPS',
-            ':password_hash' => password_hash('panitia123', PASSWORD_BCRYPT),
-            ':role'          => 'panitia',
+            ':username'      => 'kprm',
+            ':nama_lengkap'  => 'Komisi Pemilihan Raya (KPRM)',
+            ':password_hash' => password_hash('Pemira@Kprm2026!', PASSWORD_BCRYPT),
+            ':role'          => 'kprm',
         ]);
+
+        $stmt_user->execute([
+            ':username'      => 'banwasra',
+            ':nama_lengkap'  => 'Badan Pengawas PEMIRA (BANWASRA)',
+            ':password_hash' => password_hash('Pemira@Banwasra2026!', PASSWORD_BCRYPT),
+            ':role'          => 'banwasra',
+        ]);
+    } else {
+        // Pastikan akun banwasra tersedia bila bermigrasi dari skema lama
+        $stmt_ban = $pdo->prepare('SELECT COUNT(*) FROM users WHERE role = "banwasra"');
+        $stmt_ban->execute();
+        if ((int) $stmt_ban->fetchColumn() === 0) {
+            $stmt_ins_ban = $pdo->prepare('
+                INSERT IGNORE INTO users (username, nama_lengkap, password_hash, role, is_active)
+                VALUES (:username, :nama_lengkap, :password_hash, :role, 1)
+            ');
+            $stmt_ins_ban->execute([
+                ':username'      => 'banwasra',
+                ':nama_lengkap'  => 'Badan Pengawas PEMIRA (BANWASRA)',
+                ':password_hash' => password_hash('Pemira@Banwasra2026!', PASSWORD_BCRYPT),
+                ':role'          => 'banwasra',
+            ]);
+        }
     }
 
     // 2. Seed Pengaturan Sistem Global
@@ -42,8 +65,13 @@ function run_initial_seeder(PDO $pdo): void
         ],
         [
             'kunci'      => 'wajib_checkin_panitia',
-            'nilai'      => '0',
+            'nilai'      => '1',
             'keterangan' => '1 = Wajib diaktifkan panitia sebelum masuk bilik, 0 = Langsung aktif pakai NIM',
+        ],
+        [
+            'kunci'      => 'live_count_publik',
+            'nilai'      => 'BUKA',
+            'keterangan' => 'Status tampilan Live Count publik (BUKA / TUTUP)',
         ],
         [
             'kunci'      => 'nama_institusi',

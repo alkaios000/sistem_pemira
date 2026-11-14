@@ -3,10 +3,11 @@
  * MANAJEMEN JURUSAN / PROGRAM STUDI - Adminator 2026 Redesign
  * Master data jurusan terpusat yang terhubung ke Data DPT (Kelas) dan Kandidat.
  */
-require_auth();
+require_role(['superadmin', 'kprm', 'banwasra']);
 require_once BASE_PATH . '/models/jurusan_model.php';
 
 $pdo = get_db_connection();
+$canWrite = can_manage_pemira();
 $pageTitle = 'Manajemen Jurusan';
 
 $jurusanList = get_all_jurusans_with_stats($pdo);
@@ -16,7 +17,11 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <section class="hero">
     <div class="hero-actions">
-        <button type="button" class="btn btn--primary btn--sm" onclick="openCreateJurusanModal()">+ Tambah Jurusan</button>
+        <?php if ($canWrite): ?>
+            <button type="button" class="btn btn--primary btn--sm" onclick="openCreateJurusanModal()">+ Tambah Jurusan</button>
+        <?php else: ?>
+            <span class="badge purple dot">Mode Viewer (Read-Only · Banwasra)</span>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -63,12 +68,14 @@ require BASE_PATH . '/views/layouts/header.php';
                         <th data-sort>Kelas DPT <span class="sort">▾</span></th>
                         <th data-sort>Mahasiswa <span class="sort">▾</span></th>
                         <th data-sort>Kandidat <span class="sort">▾</span></th>
-                        <th class="text-right">Aksi</th>
+                        <?php if ($canWrite): ?>
+                            <th class="text-right">Aksi</th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($jurusanList)): ?>
-                        <tr><td colspan="7" class="table-empty">Belum ada data jurusan. Klik <strong>+ Tambah Jurusan</strong> untuk menambahkan.</td></tr>
+                        <tr><td colspan="<?= $canWrite ? 7 : 6 ?>" class="table-empty">Belum ada data jurusan.</td></tr>
                     <?php else: ?>
                         <?php foreach ($jurusanList as $j): ?>
                             <?php $jJson = json_encode($j, JSON_HEX_APOS | JSON_HEX_QUOT); ?>
@@ -79,6 +86,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 <td><span class="data-cell-mono fw-600"><?= (int)$j['total_kelas'] ?></span></td>
                                 <td><span class="data-cell-mono"><?= number_format((int)$j['total_mahasiswa']) ?></span></td>
                                 <td><span class="data-cell-mono"><?= (int)$j['total_kandidat'] ?></span></td>
+                                <?php if ($canWrite): ?>
                                 <td>
                                     <div class="data-cell-actions">
                                         <button type="button" class="btn btn--ghost btn--xs" onclick='openEditJurusanModal(<?= $jJson ?>)'>Edit</button>
@@ -90,6 +98,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                         </form>
                                     </div>
                                 </td>
+                                <?php endif; ?>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -107,6 +116,7 @@ require BASE_PATH . '/views/layouts/header.php';
 </div>
 
 <!-- Modal Tambah / Edit Jurusan -->
+<?php if ($canWrite): ?>
 <div class="modal-backdrop" id="jurusanModal">
     <div class="modal-dialog modal-sm">
         <div class="modal-head">
@@ -146,6 +156,7 @@ require BASE_PATH . '/views/layouts/header.php';
         </form>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 function openCreateJurusanModal() {

@@ -1,86 +1,78 @@
 <?php
 /**
- * LOGIN PAGE - Adminator 2026 Redesign Split Auth Shell
+ * LOGIN PAGE - Open White Canvas dengan Animasi Node Interaktif
  */
 redirect_if_authenticated();
 
-$pageTitle = 'Login Panitia';
+$pageTitle = 'Login';
 $isFullScreenLayout = true;
+$deferFlashInPage = true;
 require BASE_PATH . '/views/layouts/header.php';
 ?>
 
-<div class="auth-shell">
-    <aside class="auth-aside">
-        <div class="auth-aside-brand">
-            <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img">
-            <span>Sistem PEMIRA</span>
-        </div>
-        <div class="auth-aside-body">
-            <h2 class="auth-aside-title">Sistem Pemilihan Raya Mahasiswa Terintegrasi.</h2>
-            <p class="auth-aside-sub">Arsitektur Single-Use Dynamic QR Token per bilik, penguncian sesi otomatis (0ms), dan audit log deteksi kecurangan real-time.</p>
-            <div class="auth-aside-stats">
-                <div>
-                    <div class="auth-stat-value">8s</div>
-                    <div class="auth-stat-label">Rotasi QR</div>
-                </div>
-                <div>
-                    <div class="auth-stat-value">0ms</div>
-                    <div class="auth-stat-label">Instant Lock</div>
-                </div>
-                <div>
-                    <div class="auth-stat-value">100%</div>
-                    <div class="auth-stat-label">Secret Ballot</div>
-                </div>
-            </div>
-        </div>
-        <div class="auth-aside-foot">
-            <span>KPURM · Periode 2026/2027</span>
-            <span>Adminator 2026 UI</span>
-        </div>
-    </aside>
+<main class="auth-main">
+    <canvas class="auth-node-canvas" id="authNodeCanvas" aria-hidden="true"></canvas>
 
-    <main class="auth-main">
-        <div class="auth-card">
-            <div class="auth-head">
-                <div class="d-flex align-center gap-2 mb-2">
-                    <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img-sm">
-                    <span class="fw-700" style="font-size:13.5px;">Sistem PEMIRA · UBW</span>
-                </div>
-                <h1 class="auth-title">Masuk ke Sistem</h1>
-                <p class="auth-sub">Gunakan akun Administrator KPU atau Panitia Pengawas TPS.</p>
+    <header class="auth-banner">
+        <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo Universitas Bhina Widyantara" class="auth-banner-logo">
+        <div class="auth-banner-text">
+            <span class="auth-banner-title">Sistem PEMIRA</span>
+            <span class="auth-banner-sub">Universitas Bhina Widyantara</span>
+        </div>
+    </header>
+
+    <div class="auth-wrap">
+        <div class="auth-error-msg<?= !empty($flash) ? ' is-visible' : '' ?>" id="authErrorMsg" role="alert" aria-live="polite"><?= !empty($flash) ? e($flash['message']) : '' ?></div>
+
+        <form class="auth-form" id="authLoginForm" action="<?= e(action_url('auth')) ?>" method="POST">
+            <?= csrf_field() ?>
+            <input type="hidden" name="sub_action" value="login">
+
+            <div class="input-icon auth-input-group">
+                <span class="ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <input type="text"
+                       id="username"
+                       name="username"
+                       class="input auth-input"
+                       placeholder="Username"
+                       aria-label="Username"
+                       autocomplete="username"
+                       required
+                       autofocus>
             </div>
 
-            <form action="<?= e(action_url('auth')) ?>" method="POST">
-                <?= csrf_field() ?>
-                <input type="hidden" name="sub_action" value="login">
-
-                <div class="field">
-                    <label class="field-label" for="username">Username</label>
-                    <input type="text" id="username" name="username" class="input" placeholder="admin" required autofocus>
-                </div>
-
-                <div class="field">
-                    <label class="field-label" for="password">Password</label>
-                    <input type="password" id="password" name="password" class="input" placeholder="••••••••" required>
-                </div>
-
-                <button type="submit" class="btn btn--primary btn-block mt-3" style="padding: 9px 14px;">Masuk Sistem</button>
-            </form>
-
-            <div class="card mt-4" style="padding: 12px 14px; background: var(--bg-hover);">
-                <div class="eyebrow mb-2">Portal Publik & Bilik</div>
-                <div class="d-flex flex-wrap gap-2">
-                    <a href="<?= e(route_url('portal_qr')) ?>" class="btn btn--soft-primary btn--sm">Portal QR</a>
-                    <a href="<?= e(route_url('bilik_pemilihan')) ?>" class="btn btn--ghost btn--sm">Bilik Suara</a>
-                    <a href="<?= e(route_url('live_count_bem')) ?>" class="btn btn--ghost btn--sm">Live BEM</a>
-                    <a href="<?= e(route_url('live_count_bpm')) ?>" class="btn btn--ghost btn--sm">Live BPM</a>
-                </div>
-                <div class="mt-2 pt-2" style="border-top: 1px dashed var(--border); font-size: 11px; color: var(--t-muted);">
-                    Akun: <span class="mono">admin</span> (<span class="mono">admin123</span>) · <span class="mono">panitia</span> (<span class="mono">panitia123</span>)
-                </div>
+            <div class="input-icon auth-input-group has-suffix">
+                <span class="ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </span>
+                <input type="password"
+                       id="password"
+                       name="password"
+                       class="input auth-input"
+                       placeholder="Password"
+                       aria-label="Password"
+                       autocomplete="current-password"
+                       required>
+                <button type="button"
+                        class="auth-eye-btn"
+                        data-toggle-password="password"
+                        aria-label="Tampilkan atau sembunyikan password"
+                        title="Tampilkan / Sembunyikan Password">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
             </div>
-        </div>
-    </main>
-</div>
+
+            <button type="submit" class="btn btn--primary btn-block auth-submit">Masuk</button>
+        </form>
+    </div>
+
+    <nav class="auth-shortcuts" aria-label="Pintasan Halaman">
+        <a href="<?= e(route_url('bilik_pemilihan')) ?>" class="auth-shortcut-link">Bilik Suara</a>
+        <a href="<?= e(route_url('live_count_bem')) ?>" class="auth-shortcut-link">Live BEM</a>
+        <a href="<?= e(route_url('live_count_bpm')) ?>" class="auth-shortcut-link">Live BPM</a>
+    </nav>
+</main>
 
 <?php require BASE_PATH . '/views/layouts/footer.php'; ?>

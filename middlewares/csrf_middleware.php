@@ -20,8 +20,8 @@ function verify_csrf_request(bool $is_ajax = false): void
             json_response(false, 'Token keamanan CSRF tidak valid atau kadaluarsa. Silakan muat ulang halaman.', [], 419);
         }
         set_flash('danger', 'Sesi formulir telah kadaluarsa (CSRF Invalid). Silakan ulangi tindakan Anda.');
-        $referer = $_SERVER['HTTP_REFERER'] ?? route_url('dashboard');
-        redirect($referer);
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+        $fallback = is_authenticated() ? route_url('dashboard') : route_url('login');
+        redirect(is_safe_internal_url($referer) ? $referer : $fallback);
     }
 }
-

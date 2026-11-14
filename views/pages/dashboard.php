@@ -3,7 +3,7 @@
  * DASHBOARD PAGE - Adminator 2026 Redesign Overview (Fitur 3)
  * Menampilkan KPI Global, Perolehan Suara BEM & BPM, Partisipasi per Kelas/Jurusan/Semester, dan Log Keamanan Terbaru.
  */
-require_auth();
+require_role(['superadmin', 'kprm', 'banwasra']);
 
 require_once BASE_PATH . '/models/mahasiswa_model.php';
 require_once BASE_PATH . '/models/kandidat_model.php';
@@ -14,14 +14,23 @@ require_once BASE_PATH . '/models/user_model.php';
 $pdo = get_db_connection();
 $pageTitle = 'Dashboard';
 
+$canViewLogs = can_view_logs();
+$excludeSuperadminLogs = is_banwasra();
+$isViewerOnly = !can_manage_pemira();
+
 $dptStats = get_dpt_global_stats($pdo);
 $kelasStats = get_all_kelas_with_stats($pdo);
-$biliks = get_all_biliks($pdo);
-$logStats = get_audit_log_stats($pdo);
+$biliks = get_all_biliks_sanitized($pdo, $canViewLogs, $excludeSuperadminLogs);
+$logStats = $canViewLogs
+    ? get_audit_log_stats($pdo, $excludeSuperadminLogs)
+    : ['total_logs' => 0, 'total_normal' => 0, 'total_fraud' => 0, 'total_all' => 0, 'total_pemilih' => 0, 'total_admin' => 0, 'fraud_breakdown' => []];
 $bemSummary = get_live_count_summary($pdo, 'BEM');
 $bpmSummary = get_live_count_summary($pdo, 'BPM');
-$recentLogs = get_audit_logs($pdo, null, null, '', 8);
+$recentLogsAll = $canViewLogs ? get_audit_logs($pdo, null, null, '', 8, $excludeSuperadminLogs) : [];
+$recentLogsPemilih = $canViewLogs ? get_audit_logs($pdo, null, null, '', 8, $excludeSuperadminLogs, 'pemilih') : [];
+$recentLogsAdmin = $canViewLogs ? get_audit_logs($pdo, null, null, '', 8, $excludeSuperadminLogs, 'admin') : [];
 $globalPortal = get_setting_value($pdo, 'status_portal_global', 'BUKA');
+$liveCountPublik = get_setting_value($pdo, 'live_count_publik', 'BUKA');
 
 $totalBilik = count($biliks);
 $bilikIdle = 0;
@@ -36,8 +45,13 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <section class="hero">
     <div class="hero-actions">
+        <?php if ($isViewerOnly): ?>
+            <span class="badge purple dot">Mode Viewer (Read-Only)</span>
+        <?php endif; ?>
         <span class="badge <?= $globalPortal === 'BUKA' ? 'success' : 'danger' ?> dot">Portal <?= e($globalPortal) ?></span>
+        <span class="badge <?= $liveCountPublik === 'BUKA' ? 'info' : 'warn' ?> dot">Live Count <?= e($liveCountPublik) ?></span>
         <a href="<?= e(route_url('portal_qr')) ?>" class="btn btn--soft-primary btn--sm">Portal QR Bilik</a>
+        <a href="<?= e(route_url('bilik_pemilihan')) ?>" target="_blank" rel="noopener noreferrer" class="btn btn--soft-primary btn--sm">Layar Bilik Suara ↗</a>
         <a href="<?= e(route_url('live_count_bem')) ?>" class="btn btn--primary btn--sm">Live Count</a>
     </div>
 </section>
@@ -80,19 +94,33 @@ require BASE_PATH . '/views/layouts/header.php';
         </div>
     </div>
 
-    <div class="kpi-card">
-        <div class="kpi-top">
-            <span class="kpi-label">Normal vs Fraud Log</span>
-            <span class="kpi-pill <?= $logStats['total_fraud'] > 0 ? 'down' : 'up' ?>">
-                <?= $logStats['total_fraud'] ?> Fraud
-            </span>
+    <?php if ($canViewLogs): ?>
+        <div class="kpi-card">
+            <div class="kpi-top">
+                <span class="kpi-label">Normal vs Fraud Log</span>
+                <span class="kpi-pill <?= $logStats['total_fraud'] > 0 ? 'down' : 'up' ?>">
+                    <?= $logStats['total_fraud'] ?> Fraud
+                </span>
+            </div>
+            <div class="kpi-value"><?= number_format($logStats['total_normal']) ?><sup>Normal</sup></div>
+            <div class="kpi-compare">
+                <strong><?= number_format($logStats['total_logs']) ?></strong>
+                <span>Pemilih: <?= number_format($logStats['total_pemilih']) ?> · Admin: <?= number_format($logStats['total_admin']) ?></span>
+            </div>
         </div>
-        <div class="kpi-value"><?= number_format($logStats['total_normal']) ?><sup>Normal</sup></div>
-        <div class="kpi-compare">
-            <strong><?= number_format($logStats['total_logs']) ?></strong>
-            <span>total aktivitas terekam</span>
+    <?php else: ?>
+        <div class="kpi-card">
+            <div class="kpi-top">
+                <span class="kpi-label">Kandidat Terdaftar</span>
+                <span class="kpi-pill info">BEM &amp; BPM</span>
+            </div>
+            <div class="kpi-value"><?= count($bemSummary['kandidats']) + count($bpmSummary['kandidats']) ?></div>
+            <div class="kpi-compare">
+                <strong><?= count($bemSummary['kandidats']) ?> BEM</strong>
+                <span>· <?= count($bpmSummary['kandidats']) ?> BPM aktif</span>
+            </div>
         </div>
-    </div>
+    <?php endif; ?>
 </div>
 
 <!-- Perolehan Suara Ringkas BEM & BPM -->
@@ -200,32 +228,61 @@ require BASE_PATH . '/views/layouts/header.php';
         </div>
     </section>
 
-    <!-- Log Keamanan Terbaru -->
-    <section class="col-12 card">
-        <div class="card-head">
+    <?php if ($canViewLogs): ?>
+    <!-- Log Keamanan Terbaru (Eksklusif Superadmin & Banwasra) -->
+    <section class="col-12 card" id="dashboardRecentLogsCard">
+        <div class="card-head" style="flex-wrap:wrap;gap:12px;">
             <div class="card-title-wrap">
-                <h3 class="card-title">Aktivitas & Log Keamanan Terbaru</h3>
+                <h3 class="card-title">Aktivitas &amp; Log Keamanan Terbaru</h3>
+                <p class="card-sub"><?= $excludeSuperadminLogs ? 'Terpisah antara log aktivitas pemilih & pengguna manajemen (KPRM & Banwasra, tanpa Superadmin)' : 'Terpisah antara log aktivitas pemilih di bilik dan seluruh pengguna manajemen panel' ?></p>
             </div>
-            <a href="<?= e(route_url('log_keamanan')) ?>" class="btn btn--ghost btn--sm">Lihat Semua</a>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <div class="tabs pills" role="tablist" style="margin-bottom:0;">
+                    <button type="button" class="tab is-active" data-dash-log-tab="all">Semua (<?= count($recentLogsAll) ?>)</button>
+                    <button type="button" class="tab" data-dash-log-tab="pemilih">Pemilih (<?= number_format($logStats['total_pemilih']) ?>)</button>
+                    <button type="button" class="tab" data-dash-log-tab="admin">Admin (<?= number_format($logStats['total_admin']) ?>)</button>
+                </div>
+                <a href="<?= e(route_url('log_keamanan', ['tab' => 'pemilih'])) ?>" class="btn btn--soft-primary btn--sm">Log Pemilih</a>
+                <a href="<?= e(route_url('log_keamanan', ['tab' => 'admin'])) ?>" class="btn btn--ghost btn--sm">Log Admin</a>
+            </div>
         </div>
-        <div class="data-table-wrap">
+        <?php
+        $dashPanels = [
+            'all'     => $recentLogsAll,
+            'pemilih' => $recentLogsPemilih,
+            'admin'   => $recentLogsAdmin,
+        ];
+        foreach ($dashPanels as $panelKey => $panelRows):
+        ?>
+        <div class="data-table-wrap" data-dash-log-panel="<?= e($panelKey) ?>" <?= $panelKey !== 'all' ? 'style="display:none;"' : '' ?>>
             <table class="data-table">
                 <thead>
                     <tr>
                         <th>Waktu</th>
                         <th>Status</th>
+                        <th>Jenis</th>
                         <th>Kode Event</th>
                         <th>Keterangan</th>
-                        <th>NIM / Mahasiswa</th>
+                        <th><?= $panelKey === 'admin' ? 'Pengguna Manajemen' : ($panelKey === 'pemilih' ? 'Pemilih (NIM / Nama)' : 'Aktor / Pemilih') ?></th>
                         <th>Bilik</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($recentLogs)): ?>
-                        <tr><td colspan="6" class="table-empty">Belum ada log aktivitas.</td></tr>
+                    <?php if (empty($panelRows)): ?>
+                        <tr><td colspan="7" class="table-empty">Belum ada log pada kategori ini.</td></tr>
                     <?php else: ?>
-                        <?php foreach ($recentLogs as $log): ?>
-                            <?php $isFraud = ($log['status_log'] === 'FRAUD'); ?>
+                        <?php foreach ($panelRows as $log): ?>
+                            <?php
+                            $isFraud = ($log['status_log'] === 'FRAUD');
+                            $logCategory = ($log['log_category'] ?? 'pemilih') === 'admin' ? 'admin' : 'pemilih';
+                            $actorRoleRaw = strtolower((string) ($log['actor_role'] ?? ''));
+                            $roleBadgeClass = match ($actorRoleRaw) {
+                                'superadmin' => 'danger',
+                                'kprm'       => 'primary',
+                                'banwasra'   => 'purple',
+                                default      => 'warning',
+                            };
+                            ?>
                             <tr class="data-row <?= $isFraud ? 'row-log-fraud' : 'row-log-normal' ?>">
                                 <td><span class="data-cell-mono"><?= e(format_tanggal_indo($log['created_at'])) ?></span></td>
                                 <td>
@@ -233,9 +290,25 @@ require BASE_PATH . '/views/layouts/header.php';
                                         <?= $isFraud ? 'FRAUD' : 'NORMAL' ?>
                                     </span>
                                 </td>
+                                <td>
+                                    <span class="badge <?= $logCategory === 'admin' ? 'purple' : 'info' ?>">
+                                        <?= $logCategory === 'admin' ? 'ADMIN' : 'PEMILIH' ?>
+                                    </span>
+                                </td>
                                 <td><span class="data-cell-mono fw-600"><?= e($log['kode_event']) ?></span></td>
                                 <td><?= e($log['keterangan']) ?></td>
-                                <td><span class="data-cell-mono"><?= e($log['nim'] ?? '-') ?></span> <?= !empty($log['nama_mahasiswa']) ? '· ' . e($log['nama_mahasiswa']) : '' ?></td>
+                                <td>
+                                    <?php if ($logCategory === 'admin'): ?>
+                                        <span class="data-cell-mono fw-600"><?= e($log['actor_username'] ?: '-') ?></span>
+                                        <span class="badge <?= $roleBadgeClass ?>">
+                                            <?= e($actorRoleRaw !== '' ? strtoupper($actorRoleRaw) : 'PANEL') ?>
+                                        </span>
+                                    <?php elseif (!empty($log['nim'])): ?>
+                                        <span class="data-cell-mono"><?= e($log['nim']) ?></span> <?= !empty($log['nama_mahasiswa']) ? '· ' . e($log['nama_mahasiswa']) : '' ?>
+                                    <?php else: ?>
+                                        <span class="text-muted">Anonim / Pra-Verifikasi</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td><span class="data-cell-mono"><?= e($log['nama_bilik'] ?? '-') ?></span></td>
                             </tr>
                         <?php endforeach; ?>
@@ -243,7 +316,26 @@ require BASE_PATH . '/views/layouts/header.php';
                 </tbody>
             </table>
         </div>
+        <?php endforeach; ?>
     </section>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const card = document.getElementById('dashboardRecentLogsCard');
+        if (!card) return;
+        card.addEventListener('click', e => {
+            const btn = e.target.closest('[data-dash-log-tab]');
+            if (!btn) return;
+            const targetKey = btn.getAttribute('data-dash-log-tab');
+            card.querySelectorAll('[data-dash-log-tab]').forEach(b => {
+                b.classList.toggle('is-active', b === btn);
+            });
+            card.querySelectorAll('[data-dash-log-panel]').forEach(panel => {
+                panel.style.display = panel.getAttribute('data-dash-log-panel') === targetKey ? '' : 'none';
+            });
+        });
+    });
+    </script>
+    <?php endif; ?>
 </div>
 
 <?php require BASE_PATH . '/views/layouts/footer.php'; ?>

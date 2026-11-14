@@ -17,16 +17,19 @@ $userName = $_SESSION['nama_lengkap'] ?? 'Panitia PEMIRA';
     </div>
 
     <nav class="nav-section">
-        <div class="nav-label">Overview</div>
+        <div class="nav-label"><?= is_banwasra() ? 'Overview (Viewer)' : 'Overview' ?></div>
         <a href="<?= e(route_url('dashboard')) ?>" class="nav-link <?= $currentPage === 'dashboard' ? 'is-active' : '' ?>">
             <span>Dashboard</span>
+            <?php if (is_banwasra()): ?>
+                <span class="nav-badge">VIEWER</span>
+            <?php endif; ?>
         </a>
     </nav>
 
     <nav class="nav-section">
-        <div class="nav-label">Master & Bilik</div>
+        <div class="nav-label">Master &amp; Bilik</div>
         <a href="<?= e(route_url('manajemen_kandidat')) ?>" class="nav-link <?= $currentPage === 'manajemen_kandidat' ? 'is-active' : '' ?>">
-            <span>Kandidat & Timses</span>
+            <span>Kandidat &amp; Timses</span>
         </a>
         <a href="<?= e(route_url('portal_qr')) ?>" class="nav-link <?= in_array($currentPage, ['portal_qr', 'manajemen_bilik'], true) ? 'is-active' : '' ?>">
             <span>Portal QR Bilik</span>
@@ -40,24 +43,33 @@ $userName = $_SESSION['nama_lengkap'] ?? 'Panitia PEMIRA';
         </a>
     </nav>
 
-    <nav class="nav-section">
-        <div class="nav-label">Keamanan & Audit</div>
-        <a href="<?= e(route_url('log_keamanan')) ?>" class="nav-link <?= $currentPage === 'log_keamanan' ? 'is-active' : '' ?>">
-            <span>Log Keamanan</span>
-        </a>
-    </nav>
+    <?php if (can_view_logs() || is_superadmin()): ?>
+        <nav class="nav-section">
+            <div class="nav-label">Pengawasan &amp; Akses</div>
+            <?php if (can_view_logs()): ?>
+                <?php $activeLogTab = strtolower(trim((string) ($_GET['tab'] ?? $_GET['category'] ?? ''))); ?>
+                <a href="<?= e(route_url('log_keamanan', ['tab' => 'pemilih'])) ?>" class="nav-link <?= ($currentPage === 'log_keamanan' && $activeLogTab === 'pemilih') ? 'is-active' : '' ?>">
+                    <span>Log Pemilih</span>
+                    <span class="nav-badge">BILIK</span>
+                </a>
+                <a href="<?= e(route_url('log_keamanan', ['tab' => 'admin'])) ?>" class="nav-link <?= ($currentPage === 'log_keamanan' && $activeLogTab === 'admin') ? 'is-active' : '' ?>">
+                    <span>Log Admin</span>
+                    <span class="nav-badge"><?= is_banwasra() ? 'AUDIT' : 'PANEL' ?></span>
+                </a>
+            <?php endif; ?>
+            <?php if (is_superadmin()): ?>
+                <a href="<?= e(route_url('manajemen_user')) ?>" class="nav-link <?= $currentPage === 'manajemen_user' ? 'is-active' : '' ?>">
+                    <span>Manajemen Akun</span>
+                </a>
+            <?php endif; ?>
+        </nav>
+    <?php endif; ?>
 
     <nav class="nav-section">
-        <div class="nav-label">Publik & Bilik</div>
-        <a href="<?= e(route_url('live_count_bem')) ?>" class="nav-link <?= $currentPage === 'live_count_bem' ? 'is-active' : '' ?>">
-            <span>Live Count BEM</span>
-        </a>
-        <a href="<?= e(route_url('live_count_bpm')) ?>" class="nav-link <?= $currentPage === 'live_count_bpm' ? 'is-active' : '' ?>">
-            <span>Live Count BPM</span>
-        </a>
-        <a href="<?= e(route_url('bilik_pemilihan')) ?>" target="_blank" class="nav-link">
-            <span>Layar Bilik Suara</span>
-            <span class="nav-badge">↗</span>
+        <div class="nav-label">Publik</div>
+        <a href="<?= e(route_url('live_count_bem')) ?>" class="nav-link <?= in_array($currentPage, ['live_count_bem', 'live_count_bpm'], true) ? 'is-active' : '' ?>">
+            <span>Live Count</span>
+            <span class="nav-badge">BEM/BPM</span>
         </a>
     </nav>
 </aside>

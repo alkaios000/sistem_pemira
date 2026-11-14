@@ -1,6 +1,16 @@
 /**
  * MAHASISWA_IMPORT.JS - Adminator 2026 Redesign CSV / Paste DPT Import Preview
  */
+function escImportHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function fillSampleImport() {
     const rand = Math.floor(100 + Math.random() * 899);
     document.getElementById('rawImportText').value =
@@ -56,10 +66,10 @@ function previewImportBatch() {
                 }
                 return `
                     <tr class="data-row ${r.is_valid ? 'row-log-normal' : 'row-log-fraud'}">
-                        <td><span class="data-cell-mono">${r.no}</span></td>
-                        <td><span class="data-cell-mono fw-600">${r.nim}</span></td>
-                        <td>${r.nama_lengkap}</td>
-                        <td><span class="badge ${r.is_valid ? 'success' : 'danger'} dot">${r.catatan}</span></td>
+                        <td><span class="data-cell-mono">${escImportHtml(r.no)}</span></td>
+                        <td><span class="data-cell-mono fw-600">${escImportHtml(r.nim)}</span></td>
+                        <td>${escImportHtml(r.nama_lengkap)}</td>
+                        <td><span class="badge ${r.is_valid ? 'success' : 'danger'} dot">${escImportHtml(r.catatan)}</span></td>
                     </tr>
                 `;
             }).join('');

@@ -4,13 +4,16 @@
  * Mengelola CRUD Bilik Suara, Pintasan Portal QR per Bilik, Kontrol Status Global/Per Bilik,
  * Monitoring Sesi & Token Real-Time, serta Force Reset Kunci Bilik.
  */
-require_auth();
+require_role(['superadmin', 'kprm', 'banwasra']);
 require_once BASE_PATH . '/models/bilik_model.php';
 require_once BASE_PATH . '/models/user_model.php';
 
 $pdo = get_db_connection();
 $pageTitle = 'Manajemen Bilik';
-$bilikList = get_all_biliks($pdo);
+$canWrite = can_manage_pemira();
+$canViewLogs = can_view_logs();
+$excludeSuperadminLogs = is_banwasra();
+$bilikList = get_all_biliks_sanitized($pdo, $canViewLogs, $excludeSuperadminLogs);
 $globalPortal = get_setting_value($pdo, 'status_portal_global', 'BUKA');
 $wajibCheckin = get_setting_value($pdo, 'wajib_checkin_panitia', '0');
 
@@ -31,6 +34,7 @@ require BASE_PATH . '/views/layouts/header.php';
     <div class="hero-actions">
         <button type="button" class="btn btn--soft-primary btn--sm" id="btnToggleLiveBilik" data-live="1">Live Sync: ON (2s)</button>
 
+        <?php if ($canWrite): ?>
         <span id="bilikHeroGlobalControls" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <form action="<?= e(action_url('bilik')) ?>" method="POST" style="display:inline;">
                 <?= csrf_field() ?>
@@ -52,6 +56,9 @@ require BASE_PATH . '/views/layouts/header.php';
         </span>
 
         <button type="button" class="btn btn--primary btn--sm" onclick="openCreateBilikModal()">+ Tambah Bilik</button>
+        <?php else: ?>
+            <span class="badge purple dot">Mode Viewer (Read-Only)</span>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -119,11 +126,8 @@ require BASE_PATH . '/views/layouts/header.php';
                 if ($st === 'IN_USE') $statusClass = 'status-used';
                 elseif ($st === 'CLOSED') $statusClass = 'status-locked';
 
-                $tokenShort = !empty($b['current_token']) ? strtoupper(substr((string) $b['current_token'], 0, 12)) . '...' : '-';
-                $remainLock = 0;
-                if ($st === 'IN_USE' && !empty($b['locked_until'])) {
-                    $remainLock = max(0, strtotime($b['locked_until']) - time());
-                }
+                $tokenShort = !empty($b['token_hint']) ? strtoupper((string) $b['token_hint']) : '-';
+                $remainLock = (int) ($b['remaining_lock_seconds'] ?? 0);
                 $bJson = json_encode($b, JSON_HEX_APOS | JSON_HEX_QUOT);
                 ?>
                 <div class="bilik-card <?= $statusClass ?>" data-bilik-card="<?= (int)$b['id'] ?>" data-status="<?= e($st) ?>">
@@ -161,8 +165,8 @@ require BASE_PATH . '/views/layouts/header.php';
                             </div>
                             <div style="min-width:0;">
                                 <div class="bilik-meta-label">NIM Sesi Aktif</div>
-                                <div class="bilik-meta-val" style="color:<?= !empty($b['active_nim']) ? 'var(--primary)' : 'var(--t-muted)' ?>;">
-                                    <?= e($b['active_nim'] ?: 'Menunggu Scan') ?>
+                                <div class="bilik-meta-val" style="color:<?= !empty($b['active_nim_masked']) ? 'var(--primary)' : 'var(--t-muted)' ?>;">
+                                    <?= e($b['active_nim_masked'] ?: 'Menunggu Scan') ?>
                                 </div>
                                 <div class="bilik-meta-sub">
                                     <?= $st === 'IN_USE' ? 'Terkunci perangkat' : 'Siap klaim QR' ?>
@@ -175,6 +179,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 <span class="bilik-meta-label" style="margin:0;">Suara Masuk:</span>
                                 <span class="badge primary"><?= number_format((int)$b['total_suara_bilik']) ?> Suara</span>
                             </div>
+                            <?php if ($canViewLogs): ?>
                             <div class="d-flex align-center gap-2">
                                 <span class="bilik-meta-label" style="margin:0;">Fraud:</span>
                                 <?php if ((int)$b['total_fraud_bilik'] > 0): ?>
@@ -183,6 +188,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                     <span class="badge neutral">0</span>
                                 <?php endif; ?>
                             </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -191,6 +197,7 @@ require BASE_PATH . '/views/layouts/header.php';
                         <a href="<?= e(route_url('portal_qr', ['booth' => (int)$b['nomor_bilik']])) ?>" class="btn btn--soft-primary btn--xs">
                             Layar QR ↗
                         </a>
+                        <?php if ($canWrite): ?>
                         <div class="data-cell-actions">
                             <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Reset token QR dan lepas kunci sesi bilik ini?">
                                 <?= csrf_field() ?>
@@ -217,6 +224,7 @@ require BASE_PATH . '/views/layouts/header.php';
                                 <button type="submit" class="btn btn--soft-danger btn--xs" title="Hapus Bilik">×</button>
                             </form>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -224,6 +232,7 @@ require BASE_PATH . '/views/layouts/header.php';
     </section>
 </div>
 
+<?php if ($canWrite): ?>
 <!-- Modal Form Bilik -->
 <div class="modal-backdrop" id="bilikModal">
     <div class="modal-dialog modal-sm">
@@ -256,6 +265,7 @@ require BASE_PATH . '/views/layouts/header.php';
         </form>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 function openCreateBilikModal() {

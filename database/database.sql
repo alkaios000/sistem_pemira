@@ -4,13 +4,15 @@
 CREATE DATABASE IF NOT EXISTS `db_sistem_pemira` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `db_sistem_pemira`;
 
--- 01: Tabel Pengguna Admin/Panitia dan Pengaturan Sistem Global
+-- 01: Tabel Pengguna Admin/KPRM/BANWASRA dan Pengaturan Sistem Global
 CREATE TABLE IF NOT EXISTS `users` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `username` VARCHAR(60) NOT NULL,
     `nama_lengkap` VARCHAR(120) NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL,
-    `role` ENUM('admin', 'panitia') NOT NULL DEFAULT 'admin',
+    `role` ENUM('superadmin', 'kprm', 'banwasra') NOT NULL DEFAULT 'kprm',
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `last_login_at` DATETIME DEFAULT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -152,6 +154,10 @@ CREATE TABLE IF NOT EXISTS `device_sessions` (
 CREATE TABLE IF NOT EXISTS `audit_logs` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `bilik_id` INT UNSIGNED DEFAULT NULL,
+    `actor_user_id` INT UNSIGNED DEFAULT NULL,
+    `actor_username` VARCHAR(60) DEFAULT NULL,
+    `actor_role` ENUM('superadmin', 'kprm', 'banwasra') DEFAULT NULL,
+    `log_category` ENUM('pemilih', 'admin') NOT NULL DEFAULT 'pemilih',
     `nim` VARCHAR(30) DEFAULT NULL,
     `nama_mahasiswa_cache` VARCHAR(150) DEFAULT NULL,
     `device_id` VARCHAR(128) NOT NULL,
@@ -169,6 +175,38 @@ CREATE TABLE IF NOT EXISTS `audit_logs` (
     KEY `idx_audit_nim` (`nim`),
     KEY `idx_audit_device` (`device_id`),
     KEY `idx_audit_created` (`created_at`),
+    KEY `idx_audit_actor_role` (`actor_role`),
+    KEY `idx_audit_actor_user` (`actor_user_id`),
+    KEY `idx_audit_log_category` (`log_category`),
     CONSTRAINT `fk_audit_logs_bilik` FOREIGN KEY (`bilik_id`) REFERENCES `bilik_suaras` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 07: Tabel Rate Limit Keamanan & Kotak Suara Anonim
+CREATE TABLE IF NOT EXISTS `security_rate_limits` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `scope` VARCHAR(40) NOT NULL,
+    `identifier` VARCHAR(191) NOT NULL,
+    `attempts` INT UNSIGNED NOT NULL DEFAULT 0,
+    `window_started_at` DATETIME NOT NULL,
+    `locked_until` DATETIME DEFAULT NULL,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_rate_limit_scope_ident` (`scope`, `identifier`),
+    KEY `idx_rate_limit_locked` (`locked_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ballot_boxes` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `ballot_hash` CHAR(64) NOT NULL,
+    `bilik_id` INT UNSIGNED DEFAULT NULL,
+    `kandidat_bem_id` INT UNSIGNED NOT NULL,
+    `kandidat_bpm_id` INT UNSIGNED NOT NULL,
+    `cast_bucket` DATETIME NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uq_ballot_hash` (`ballot_hash`),
+    KEY `idx_ballot_bem` (`kandidat_bem_id`),
+    KEY `idx_ballot_bpm` (`kandidat_bpm_id`),
+    KEY `idx_ballot_bucket` (`cast_bucket`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

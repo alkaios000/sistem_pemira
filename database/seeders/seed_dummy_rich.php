@@ -23,6 +23,8 @@ function run_rich_dummy_seeder(PDO $pdo): array
 
     // 1. Kosongkan seluruh tabel secara aman (TRUNCATE melakukan implicit commit, dijalankan di luar transaksi)
     $tablesToTruncate = [
+        'ballot_boxes',
+        'security_rate_limits',
         'audit_logs',
         'device_sessions',
         'bilik_suaras',
@@ -57,15 +59,15 @@ function run_rich_dummy_seeder(PDO $pdo): array
     try {
         $now = time();
 
-        // 2. Akun Admin & Panitia
+        // 2. Akun 3 Peran (Superadmin, KPRM, BANWASRA)
         $stmtUser = $pdo->prepare('
-            INSERT INTO users (username, nama_lengkap, password_hash, role)
-            VALUES (:username, :nama_lengkap, :password_hash, :role)
+            INSERT INTO users (username, nama_lengkap, password_hash, role, is_active)
+            VALUES (:username, :nama_lengkap, :password_hash, :role, 1)
         ');
         foreach ([
-            ['admin', 'Administrator KPU PEMIRA', 'admin123', 'admin'],
-            ['panitia', 'Panitia Pengawas TPS 01', 'panitia123', 'panitia'],
-            ['panitia2', 'Panitia Verifikasi DPT', 'panitia123', 'panitia'],
+            ['superadmin', 'Superadmin Sistem PEMIRA', 'Pemira@Super2026!', 'superadmin'],
+            ['kprm', 'Komisi Pemilihan Raya (KPRM)', 'Pemira@Kprm2026!', 'kprm'],
+            ['banwasra', 'Badan Pengawas PEMIRA (BANWASRA)', 'Pemira@Banwasra2026!', 'banwasra'],
         ] as [$uname, $fullName, $plainPass, $role]) {
             $stmtUser->execute([
                 ':username'      => $uname,
@@ -82,7 +84,8 @@ function run_rich_dummy_seeder(PDO $pdo): array
         ');
         foreach ([
             ['status_portal_global', 'BUKA', 'Status global portal pemungutan suara (BUKA / TUTUP)'],
-            ['wajib_checkin_panitia', '0', '1 = Wajib diaktifkan panitia sebelum masuk bilik, 0 = Langsung aktif pakai NIM'],
+            ['wajib_checkin_panitia', '1', '1 = Wajib diaktifkan panitia sebelum masuk bilik, 0 = Langsung aktif pakai NIM'],
+            ['live_count_publik', 'BUKA', 'Status tampilan Live Count publik (BUKA / TUTUP)'],
             ['nama_institusi', 'Komisi Pemilihan Umum Raya Mahasiswa (KPURM)', 'Nama penyelenggara PEMIRA pada portal dan laporan'],
             ['periode_pemira', '2026 / 2027', 'Tahun periode pemilihan'],
         ] as [$kunci, $nilai, $ket]) {
@@ -491,10 +494,10 @@ function run_rich_dummy_seeder(PDO $pdo): array
             INSERT INTO device_sessions (device_id, browser_session_id, fingerprint_hash, ip_address, user_agent, bilik_id, nim_terkait, sudah_digunakan_vote, jumlah_percobaan_nim, created_at)
             VALUES (:device_id, :sess, :fp, :ip, :ua, :bilik_id, :nim, 1, 1, :created_at)
         ');
-        $stmtLog = $pdo->prepare('
-            INSERT INTO audit_logs (bilik_id, nim, nama_mahasiswa_cache, device_id, fingerprint_hash, browser_session_id, ip_address, user_agent, status_log, kode_event, judul_event, keterangan, created_at)
-            VALUES (:bilik_id, :nim, :nama, :device_id, :fp, :sess, :ip, :ua, :status_log, :kode_event, :judul_event, :keterangan, :created_at)
-        ');
+        $stmtLog = $pdo->prepare("
+            INSERT INTO audit_logs (bilik_id, log_category, nim, nama_mahasiswa_cache, device_id, fingerprint_hash, browser_session_id, ip_address, user_agent, status_log, kode_event, judul_event, keterangan, created_at)
+            VALUES (:bilik_id, 'pemilih', :nim, :nama, :device_id, :fp, :sess, :ip, :ua, :status_log, :kode_event, :judul_event, :keterangan, :created_at)
+        ");
 
         $bilikPointer = 0;
         $deviceRecords = [];
@@ -684,6 +687,34 @@ function run_rich_dummy_seeder(PDO $pdo): array
             ]);
         }
 
+        // Contoh log aktivitas panel aktor (kprm, banwasra, superadmin) untuk verifikasi hak akses log
+        $stmtActorLog = $pdo->prepare("
+            INSERT INTO audit_logs (bilik_id, actor_user_id, actor_username, actor_role, log_category, nim, nama_mahasiswa_cache, device_id, ip_address, user_agent, status_log, kode_event, judul_event, keterangan, created_at)
+            VALUES (:bilik_id, :actor_uid, :actor_uname, :actor_role, 'admin', NULL, NULL, :device_id, :ip, :ua, :status_log, :kode_event, :judul_event, :keterangan, :created_at)
+        ");
+        foreach ([
+            [1, 2, 'kprm', 'kprm', 'panel_kprm', 'NORMAL', 'ADMIN_LOGIN_SUCCESS', 'Login Panel KPRM', 'Operator kprm (kprm) berhasil masuk ke sistem panel administrasi.', $now - 3600],
+            [1, 2, 'kprm', 'kprm', 'panel_kprm', 'NORMAL', 'PORTAL_GLOBAL_TOGGLE', 'Pembukaan Portal Pemungutan Suara', 'Operator KPRM mengaktifkan status portal global menjadi BUKA dan mode wajib check-in panitia.', $now - 3500],
+            [null, 3, 'banwasra', 'banwasra', 'panel_banwasra', 'NORMAL', 'ADMIN_LOGIN_SUCCESS', 'Login Pengawas BANWASRA', 'Pengawas banwasra (banwasra) masuk ke panel pengawasan.', $now - 1800],
+            [null, 1, 'superadmin', 'superadmin', 'panel_superadmin', 'NORMAL', 'ADMIN_LOGIN_SUCCESS', 'Login Superadmin Sistem', 'Superadmin superadmin melakukan verifikasi integritas sistem pra-pemilihan.', $now - 900],
+            [null, 1, 'superadmin', 'superadmin', 'panel_superadmin', 'NORMAL', 'USER_SECURITY_AUDIT', 'Konfigurasi Keamanan Superadmin', 'Superadmin meninjau pengaturan rate limit dan hak akses pengguna.', $now - 600],
+        ] as [$bId, $aUid, $aUname, $aRole, $devId, $stLog, $kode, $judul, $ket, $ts]) {
+            $stmtActorLog->execute([
+                ':bilik_id'    => $bId,
+                ':actor_uid'   => $aUid,
+                ':actor_uname' => $aUname,
+                ':actor_role'  => $aRole,
+                ':device_id'   => $devId,
+                ':ip'          => '127.0.0.1',
+                ':ua'          => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) PanelAdmin',
+                ':status_log'  => $stLog,
+                ':kode_event'  => $kode,
+                ':judul_event' => $judul,
+                ':keterangan'  => $ket,
+                ':created_at'  => date('Y-m-d H:i:s', $ts),
+            ]);
+        }
+
         $pdo->commit();
 
         return [
@@ -697,7 +728,7 @@ function run_rich_dummy_seeder(PDO $pdo): array
             'tim_sukses'      => $totalTimsesInserted,
             'bilik_suaras'    => count($bilikCatalog),
             'device_sessions' => count($deviceRecords),
-            'audit_logs'      => count($votedStudents) + count($fraudEvents),
+            'audit_logs'      => count($votedStudents) + count($fraudEvents) + 5,
         ];
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {

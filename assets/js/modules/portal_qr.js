@@ -50,16 +50,43 @@ function changeActiveBooth(boothNum) {
 }
 
 function forceRotateBoothToken() {
-    pollBoothStatus(true);
-    if (window.PemiraApp && typeof window.PemiraApp.broadcastSync === 'function') {
-        window.PemiraApp.broadcastSync('qr_rotate');
-    }
+    const root = document.getElementById('portalQrRoot');
+    const canWrite = root && (root.getAttribute('data-can-write') === '1' || root.getAttribute('data-is-admin') === '1');
+    if (!canWrite) return;
+
+    const csrf = (window.PEMIRA_CONFIG && window.PEMIRA_CONFIG.csrfToken) ? window.PEMIRA_CONFIG.csrfToken : '';
+    const url = `${window.PEMIRA_CONFIG.baseUrl}/index.php?action=voting&sub_action=force_rotate_qr`;
+    const body = new URLSearchParams({
+        booth: String(activeBoothNumber),
+        csrf_token: csrf
+    });
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-CSRF-Token': csrf,
+            'Cache-Control': 'no-cache'
+        },
+        body: body.toString()
+    })
+        .then(res => res.ok ? res.json() : null)
+        .then(res => {
+            if (!res || !res.success) return;
+            lastRenderedToken = '';
+            pollBoothStatus();
+            if (window.PemiraApp && typeof window.PemiraApp.broadcastSync === 'function') {
+                window.PemiraApp.broadcastSync('qr_rotate');
+            }
+        })
+        .catch(() => {});
 }
 
 function renderAllBiliksTable(allBiliks, globalPortal, wajibCheckin) {
     if (!Array.isArray(allBiliks)) return;
     const root = document.getElementById('portalQrRoot');
-    const isAdmin = root && root.getAttribute('data-is-admin') === '1';
+    const canWrite = root && (root.getAttribute('data-can-write') === '1' || root.getAttribute('data-is-admin') === '1');
+    const canViewLogs = root && root.getAttribute('data-can-view-logs') === '1';
     const tbody = document.getElementById('portalQrAllBiliksTbody');
     const sel = document.getElementById('portalBoothSelect');
 
@@ -120,26 +147,26 @@ function renderAllBiliksTable(allBiliks, globalPortal, wajibCheckin) {
         else if (st === 'IN_USE') badgeHtml = '<span class="badge primary dot">IN_USE</span>';
 
         const isSel = Number(b.nomor_bilik) === Number(activeBoothNumber);
-        const tokShort = b.current_token ? String(b.current_token).substring(0, 10).toUpperCase() + '...' : '-';
+        const tokShort = b.token_hint ? String(b.token_hint).toUpperCase() + '...' : (b.current_token ? String(b.current_token).substring(0, 8).toUpperCase() + '...' : '-');
         let subTokenHtml = '<div class="text-muted mono" style="font-size:10.5px;">Rotasi Otomatis 8s</div>';
         if (st === 'IN_USE') {
             const remLock = Number(b.remaining_lock_seconds || 0);
-            const nimStr = b.active_nim ? escHtml(b.active_nim) : 'Verifikasi...';
+            const nimStr = b.active_nim_masked ? escHtml(b.active_nim_masked) : (b.active_nim ? escHtml(b.active_nim) : 'Verifikasi...');
             subTokenHtml = `<div class="mono" style="font-size:10.5px;color:var(--primary);">NIM: ${nimStr} · ${remLock}s</div>`;
         } else if (st === 'CLOSED') {
             subTokenHtml = '<div class="text-muted mono" style="font-size:10.5px;">Token Dijeda</div>';
         }
 
         const fraudCount = Number(b.total_fraud_bilik || 0);
-        const fraudBadge = fraudCount > 0 ? `<span class="badge danger">${fraudCount} Fraud</span>` : '';
+        const fraudBadge = (canViewLogs && fraudCount > 0) ? `<span class="badge danger">${fraudCount} Fraud</span>` : '';
 
         let adminCell = '';
-        if (isAdmin) {
-            const bJsonSafe = JSON.stringify({
+        if (canWrite) {
+            const bEditPayload = JSON.stringify({
                 id: b.id,
                 nomor_bilik: b.nomor_bilik,
                 nama_bilik: b.nama_bilik
-            }).replace(/'/g, '&#39;');
+            });
             const isRowClosed = b.status_bilik === 'CLOSED';
             adminCell = `
                 <td class="text-right">
@@ -161,7 +188,7 @@ function renderAllBiliksTable(allBiliks, globalPortal, wajibCheckin) {
                                 ${isRowClosed ? 'Buka' : 'Tutup'}
                             </button>
                         </form>
-                        <button type="button" class="btn btn--ghost btn--xs" onclick='openEditBilikModal(${bJsonSafe})'>Edit</button>
+                        <button type="button" class="btn btn--ghost btn--xs btn-edit-bilik" data-bilik-edit="${escHtml(bEditPayload)}">Edit</button>
                         <form action="${actionUrl}" method="POST" data-confirm="Hapus bilik suara ini?">
                             <input type="hidden" name="csrf_token" value="${escHtml(csrf)}">
                             <input type="hidden" name="sub_action" value="delete_bilik">
@@ -196,13 +223,13 @@ function renderAllBiliksTable(allBiliks, globalPortal, wajibCheckin) {
     }).join('');
 }
 
-function pollBoothStatus(force = false) {
-    const url = `${window.PEMIRA_CONFIG.baseUrl}/index.php?action=voting&sub_action=poll_portal_qr&booth=${encodeURIComponent(activeBoothNumber)}${force ? '&force=1' : ''}`;
+function pollBoothStatus() {
+    const url = `${window.PEMIRA_CONFIG.baseUrl}/index.php?action=voting&sub_action=poll_portal_qr&booth=${encodeURIComponent(activeBoothNumber)}`;
 
     fetch(url, { headers: { 'Cache-Control': 'no-cache' } })
-        .then(res => res.json())
+        .then(res => res.ok ? res.json() : null)
         .then(res => {
-            if (!res.success || !res.data) return;
+            if (!res || !res.success || !res.data) return;
             const d = res.data;
 
             if (Number(d.nomor_bilik) !== Number(activeBoothNumber)) {
@@ -279,6 +306,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.getElementById('portalQrAllBiliksTbody');
     if (tbody) {
         tbody.addEventListener('click', e => {
+            const editBtn = e.target.closest('.btn-edit-bilik[data-bilik-edit]');
+            if (editBtn) {
+                try {
+                    const parsed = JSON.parse(editBtn.getAttribute('data-bilik-edit') || '{}');
+                    openEditBilikModal(parsed);
+                } catch (err) {}
+                return;
+            }
             if (e.target.closest('.data-cell-actions, button, form, a, input')) return;
             const tr = e.target.closest('tr[data-booth-num]');
             if (!tr) return;

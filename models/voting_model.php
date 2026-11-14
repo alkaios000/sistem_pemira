@@ -118,12 +118,26 @@ function claim_qr_token_for_device(
         && hash_equals((string) $bilik['active_device_id'], $device_id)
         && !empty($bilik['active_session_token'])
     ) {
+        $stmt_latest_dev = $pdo->prepare('
+            SELECT id
+            FROM device_sessions
+            WHERE device_id = :device_id AND bilik_id = :bilik_id
+            ORDER BY id DESC
+            LIMIT 1
+        ');
+        $stmt_latest_dev->execute([
+            ':device_id' => $device_id,
+            ':bilik_id'  => $bilik_id,
+        ]);
+        $dev_row = $stmt_latest_dev->fetch();
+
         return [
             'status'               => true,
             'bilik_id'             => $bilik_id,
             'nomor_bilik'          => (int) $bilik['nomor_bilik'],
             'nama_bilik'           => $bilik['nama_bilik'],
             'voting_session_token' => $bilik['active_session_token'],
+            'device_session_id'    => $dev_row ? (int) $dev_row['id'] : null,
             'active_nim'           => $bilik['active_nim'],
             'message'              => 'Melanjutkan sesi bilik suara aktif.',
         ];
@@ -225,6 +239,7 @@ function claim_qr_token_for_device(
             ':user_agent'         => $ua,
             ':bilik_id'           => $bilik_id,
         ]);
+        $device_session_id = (int) $pdo->lastInsertId();
 
         $pdo->commit();
 
@@ -234,6 +249,7 @@ function claim_qr_token_for_device(
             'nomor_bilik'          => (int) $bilik['nomor_bilik'],
             'nama_bilik'           => $bilik['nama_bilik'],
             'voting_session_token' => $voting_session_token,
+            'device_session_id'    => $device_session_id,
             'active_nim'           => null,
             'locked_until'         => $locked_until,
             'message'              => 'QR Code berhasil dipindai. Bilik suara telah dikunci untuk perangkat Anda.',
@@ -373,7 +389,7 @@ function verify_voter_nim_in_session(
             'status'       => false,
             'session_dead' => ($attempts >= $max_attempts),
             'kode_error'   => 'NIM_ALREADY_VOTED',
-            'message'      => "NIM {$mahasiswa['nim']} atas nama {$mahasiswa['nama_lengkap']} tercatat SUDAH MEMILIH. Percobaan ini telah direkam ke Log Keamanan.",
+            'message'      => "NIM {$mahasiswa['nim']} tercatat SUDAH MEMILIH. Percobaan ini telah direkam ke Log Keamanan.",
         ];
     }
 
@@ -398,11 +414,11 @@ function verify_voter_nim_in_session(
         return [
             'status'     => false,
             'kode_error' => 'NIM_NOT_CHECKED_IN',
-            'message'    => "NIM {$mahasiswa['nim']} ({$mahasiswa['nama_lengkap']}) belum melakukan verifikasi kehadiran di meja registrasi panitia.",
+            'message'    => "NIM {$mahasiswa['nim']} belum melakukan verifikasi kehadiran di meja registrasi panitia.",
         ];
     }
 
-    // Simpan NIM aktif pada bilik suara & sesi perangkat
+    // Simpan NIM aktif pada bilik suara & sesi perangkat terbaru
     $stmt_bind = $pdo->prepare('UPDATE bilik_suaras SET active_nim = :nim WHERE id = :id');
     $stmt_bind->execute([
         ':nim' => $mahasiswa['nim'],
@@ -413,6 +429,8 @@ function verify_voter_nim_in_session(
         UPDATE device_sessions
         SET nim_terkait = :nim
         WHERE device_id = :device_id AND bilik_id = :bilik_id
+        ORDER BY id DESC
+        LIMIT 1
     ');
     $stmt_dev_nim->execute([
         ':nim'       => $mahasiswa['nim'],
@@ -485,77 +503,89 @@ function submit_atomic_vote(
     string $ip,
     string $ua
 ): array {
-    $bilik = find_bilik_by_id($pdo, $bilik_id);
-    if (
-        !$bilik
-        || $bilik['status_bilik'] !== 'IN_USE'
-        || empty($bilik['active_session_token'])
-        || !hash_equals((string) $bilik['active_session_token'], $voting_session_token)
-        || !hash_equals((string) $bilik['active_device_id'], $device_id)
-        || (string) $bilik['active_nim'] !== $nim
-    ) {
-        record_audit_log($pdo, [
-            'bilik_id'           => $bilik_id ?: null,
-            'nim'                => $nim,
-            'device_id'          => $device_id,
-            'fingerprint_hash'   => $fingerprint_hash,
-            'browser_session_id' => $browser_session_id,
-            'ip_address'         => $ip,
-            'user_agent'         => $ua,
-            'status_log'         => 'FRAUD',
-            'kode_event'         => 'SESSION_HIJACK_MISMATCH',
-            'judul_event'        => 'Pengiriman Suara dengan Sesi Tidak Sah',
-            'keterangan'         => "Perangkat {$device_id} mencoba mengirim konfirmasi suara untuk NIM {$nim} tanpa sesi bilik yang valid.",
-        ]);
+    release_expired_bilik_locks($pdo);
 
-        return [
-            'status'     => false,
-            'kode_error' => 'INVALID_VOTING_SESSION',
-            'message'    => 'Sesi pemilihan tidak valid atau telah berakhir.',
-        ];
-    }
-
-    // Validasi bahwa kandidat BEM benar-benar kategori BEM dan kandidat BPM benar-benar kategori BPM
-    $stmt_bem = $pdo->prepare('SELECT id, kategori FROM kandidats WHERE id = :id AND kategori = "BEM" LIMIT 1');
-    $stmt_bem->execute([':id' => $kandidat_bem_id]);
-    $valid_bem = $stmt_bem->fetch();
-
-    $stmt_bpm = $pdo->prepare('SELECT id, kategori FROM kandidats WHERE id = :id AND kategori = "BPM" LIMIT 1');
-    $stmt_bpm->execute([':id' => $kandidat_bpm_id]);
-    $valid_bpm = $stmt_bpm->fetch();
-
-    if (!$valid_bem || !$valid_bpm) {
-        record_audit_log($pdo, [
-            'bilik_id'           => $bilik_id,
-            'nim'                => $nim,
-            'device_id'          => $device_id,
-            'fingerprint_hash'   => $fingerprint_hash,
-            'browser_session_id' => $browser_session_id,
-            'ip_address'         => $ip,
-            'user_agent'         => $ua,
-            'status_log'         => 'FRAUD',
-            'kode_event'         => 'PAYLOAD_TAMPERING',
-            'judul_event'        => 'Manipulasi Parameter Kandidat (Payload Tampering)',
-            'keterangan'         => "Perangkat {$device_id} (NIM {$nim}) mengirimkan ID kandidat BEM ({$kandidat_bem_id}) atau BPM ({$kandidat_bpm_id}) yang tidak sesuai kategori.",
-        ]);
-
-        return [
-            'status'     => false,
-            'kode_error' => 'PAYLOAD_TAMPERING',
-            'message'    => 'Pilihan kandidat tidak valid.',
-        ];
-    }
-
-    // Mulai Transaksi Atomik
+    // Mulai Transaksi Atomik sebelum membaca & mengunci baris bilik dan kandidat (mencegah TOCTOU)
     $pdo->beginTransaction();
     try {
+        $stmt_bilik_lock = $pdo->prepare('SELECT * FROM bilik_suaras WHERE id = :id LIMIT 1 FOR UPDATE');
+        $stmt_bilik_lock->execute([':id' => $bilik_id]);
+        $bilik = $stmt_bilik_lock->fetch();
+
+        if (
+            !$bilik
+            || $bilik['status_bilik'] !== 'IN_USE'
+            || empty($bilik['active_session_token'])
+            || !hash_equals((string) $bilik['active_session_token'], $voting_session_token)
+            || !hash_equals((string) $bilik['active_device_id'], $device_id)
+            || (string) $bilik['active_nim'] !== $nim
+        ) {
+            $pdo->rollBack();
+
+            record_audit_log($pdo, [
+                'bilik_id'           => $bilik_id ?: null,
+                'nim'                => $nim,
+                'device_id'          => $device_id,
+                'fingerprint_hash'   => $fingerprint_hash,
+                'browser_session_id' => $browser_session_id,
+                'ip_address'         => $ip,
+                'user_agent'         => $ua,
+                'status_log'         => 'FRAUD',
+                'kode_event'         => 'SESSION_HIJACK_MISMATCH',
+                'judul_event'        => 'Pengiriman Suara dengan Sesi Tidak Sah',
+                'keterangan'         => "Perangkat {$device_id} mencoba mengirim konfirmasi suara untuk NIM {$nim} tanpa sesi bilik yang valid.",
+            ]);
+
+            return [
+                'status'     => false,
+                'kode_error' => 'INVALID_VOTING_SESSION',
+                'message'    => 'Sesi pemilihan tidak valid atau telah berakhir.',
+            ];
+        }
+
+        // Validasi kandidat BEM & BPM di dalam transaksi (FOR UPDATE)
+        $stmt_bem = $pdo->prepare('SELECT id, kategori FROM kandidats WHERE id = :id AND kategori = "BEM" LIMIT 1 FOR UPDATE');
+        $stmt_bem->execute([':id' => $kandidat_bem_id]);
+        $valid_bem = $stmt_bem->fetch();
+
+        $stmt_bpm = $pdo->prepare('SELECT id, kategori FROM kandidats WHERE id = :id AND kategori = "BPM" LIMIT 1 FOR UPDATE');
+        $stmt_bpm->execute([':id' => $kandidat_bpm_id]);
+        $valid_bpm = $stmt_bpm->fetch();
+
+        if (!$valid_bem || !$valid_bpm) {
+            $pdo->rollBack();
+
+            record_audit_log($pdo, [
+                'bilik_id'           => $bilik_id,
+                'nim'                => $nim,
+                'device_id'          => $device_id,
+                'fingerprint_hash'   => $fingerprint_hash,
+                'browser_session_id' => $browser_session_id,
+                'ip_address'         => $ip,
+                'user_agent'         => $ua,
+                'status_log'         => 'FRAUD',
+                'kode_event'         => 'PAYLOAD_TAMPERING',
+                'judul_event'        => 'Manipulasi Parameter Kandidat (Payload Tampering)',
+                'keterangan'         => "Perangkat {$device_id} (NIM {$nim}) mengirimkan ID kandidat BEM ({$kandidat_bem_id}) atau BPM ({$kandidat_bpm_id}) yang tidak sesuai kategori.",
+            ]);
+
+            return [
+                'status'     => false,
+                'kode_error' => 'PAYLOAD_TAMPERING',
+                'message'    => 'Pilihan kandidat tidak valid.',
+            ];
+        }
+
         // 1. Update status mahasiswa menjadi sudah_memilih = 1 HANYA JIKA masih 0 (Anti Race Condition Double Submit)
-        $stmt_mhs = $pdo->prepare('
+        $wajib_checkin = (get_setting_value($pdo, 'wajib_checkin_panitia', '0') === '1');
+        $checkin_sql = $wajib_checkin ? ' AND status_hadir = 1' : '';
+
+        $stmt_mhs = $pdo->prepare("
             UPDATE mahasiswas
             SET sudah_memilih = 1,
                 waktu_memilih = NOW()
-            WHERE nim = :nim AND sudah_memilih = 0
-        ');
+            WHERE nim = :nim AND sudah_memilih = 0{$checkin_sql}
+        ");
         $stmt_mhs->execute([':nim' => $nim]);
 
         if ($stmt_mhs->rowCount() === 0) {
@@ -598,7 +628,22 @@ function submit_atomic_vote(
         ');
         $stmt_inc_bpm->execute([':id' => $kandidat_bpm_id]);
 
-        // 4. Tandai device session telah digunakan memilih (mencegah scan ke-2 kali)
+        // 4. Catat suara anonim ke kotak suara terverifikasi (tanpa NIM/device_id, bucket waktu 5 menit)
+        $bucket_ts = (int) (floor(time() / 300) * 300);
+        $ballot_hash = bin2hex(random_bytes(32));
+        $stmt_ballot = $pdo->prepare('
+            INSERT INTO ballot_boxes (ballot_hash, bilik_id, kandidat_bem_id, kandidat_bpm_id, cast_bucket)
+            VALUES (:ballot_hash, :bilik_id, :kandidat_bem_id, :kandidat_bpm_id, :cast_bucket)
+        ');
+        $stmt_ballot->execute([
+            ':ballot_hash'     => $ballot_hash,
+            ':bilik_id'        => $bilik_id,
+            ':kandidat_bem_id' => $kandidat_bem_id,
+            ':kandidat_bpm_id' => $kandidat_bpm_id,
+            ':cast_bucket'     => date('Y-m-d H:i:s', $bucket_ts),
+        ]);
+
+        // 5. Tandai sesi perangkat terbaru telah digunakan memilih (mencegah scan ke-2 kali)
         $stmt_dev_done = $pdo->prepare('
             UPDATE device_sessions
             SET sudah_digunakan_vote = 1,
@@ -606,6 +651,8 @@ function submit_atomic_vote(
                 browser_session_id = :browser_session_id,
                 fingerprint_hash = :fingerprint_hash
             WHERE device_id = :device_id
+            ORDER BY id DESC
+            LIMIT 1
         ');
         $stmt_dev_done->execute([
             ':nim'                => $nim,
@@ -614,7 +661,7 @@ function submit_atomic_vote(
             ':device_id'          => $device_id,
         ]);
 
-        // 5. Bersihkan sesi bilik suara (kembali ke IDLE dengan token QR baru) & tambah counter suara bilik
+        // 6. Bersihkan sesi bilik suara (kembali ke IDLE dengan token QR baru) & tambah counter suara bilik
         $stmt_unlock_bilik = $pdo->prepare('
             UPDATE bilik_suaras
             SET status_bilik = "IDLE",
@@ -634,7 +681,7 @@ function submit_atomic_vote(
             ':id'        => $bilik_id,
         ]);
 
-        // 6. Catat Log Audit NORMAL (Baris Hijau) tanpa menyebutkan kandidat yang dipilih
+        // 7. Catat Log Audit NORMAL (Baris Hijau) tanpa menyebutkan kandidat yang dipilih
         $mhs_detail = find_mahasiswa_by_nim($pdo, $nim);
         $nama_mhs = $mhs_detail['nama_lengkap'] ?? null;
         $info_kelas = isset($mhs_detail['nama_kelas']) ? " ({$mhs_detail['nama_kelas']})" : '';

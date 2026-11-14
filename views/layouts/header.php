@@ -4,6 +4,7 @@
  */
 $pageTitle = $pageTitle ?? 'Dashboard';
 $isFullScreenLayout = $isFullScreenLayout ?? false;
+$deferFlashInPage = $deferFlashInPage ?? false;
 $flash = get_flash();
 $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
 ?>
@@ -25,12 +26,12 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
     <link rel="apple-touch-icon" sizes="512x512" href="<?= e(asset_url('img/icons/icon-512.png')) ?>?v=2">
 
     <!-- Adminator 2026 Modular CSS -->
-    <link rel="stylesheet" href="<?= e(asset_url('css/base.css')) ?>?v=11">
-    <link rel="stylesheet" href="<?= e(asset_url('css/layout.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/base.css')) ?>?v=12">
+    <link rel="stylesheet" href="<?= e(asset_url('css/layout.css')) ?>?v=19">
     <link rel="stylesheet" href="<?= e(asset_url('css/scrollbar.css')) ?>?v=11">
     <link rel="stylesheet" href="<?= e(asset_url('css/components/buttons.css')) ?>?v=11">
     <link rel="stylesheet" href="<?= e(asset_url('css/components/cards.css')) ?>?v=11">
-    <link rel="stylesheet" href="<?= e(asset_url('css/components/forms.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/components/forms.css')) ?>?v=12">
     <link rel="stylesheet" href="<?= e(asset_url('css/components/tables.css')) ?>?v=11">
     <link rel="stylesheet" href="<?= e(asset_url('css/components/modals.css')) ?>?v=15">
     <link rel="stylesheet" href="<?= e(asset_url('css/components/badges.css')) ?>?v=11">
@@ -63,11 +64,25 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
             </div>
             <div class="topbar-actions">
                 <?php if (is_authenticated()): ?>
-                    <div class="topbar-user">
-                        <span class="topbar-user-name"><?= e($_SESSION['nama_lengkap'] ?? 'Panitia PEMIRA') ?></span>
-                        <span class="badge primary"><?= e($_SESSION['user_role'] ?? 'ADMIN') ?></span>
-                    </div>
-                    <a href="<?= e(route_url('logout')) ?>" class="btn btn--ghost btn--sm">Keluar</a>
+                    <?php
+                    $roleCode = current_user_role();
+                    $roleBadgeLabel = match ($roleCode) {
+                        'superadmin' => 'SUPERADMIN',
+                        'banwasra'   => 'BANWASRA · VIEWER',
+                        'kprm'       => 'KPRM',
+                        default      => strtoupper($roleCode ?: 'PANEL'),
+                    };
+                    $roleBadgeClass = $roleCode === 'banwasra' ? 'purple' : ($roleCode === 'kprm' ? 'info' : 'primary');
+                    ?>
+                    <a href="<?= e(route_url('profil_akun')) ?>" class="topbar-user <?= ($currentPage ?? '') === 'profil_akun' ? 'is-active' : '' ?>" style="text-decoration:none;color:inherit;" title="Profil Akun &amp; Ganti Kata Sandi">
+                        <span class="topbar-user-name"><?= e($_SESSION['nama_lengkap'] ?? 'Pengguna Panel') ?></span>
+                        <span class="badge <?= $roleBadgeClass ?>"><?= e($roleBadgeLabel) ?></span>
+                    </a>
+                    <form action="<?= e(action_url('auth')) ?>" method="POST" style="display:inline;margin:0;" onsubmit="return confirm('Keluar dari sesi panel ini?');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="sub_action" value="logout">
+                        <button type="submit" class="btn btn--ghost btn--sm">Keluar</button>
+                    </form>
                 <?php endif; ?>
             </div>
         </header>
@@ -79,7 +94,7 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
             <?php endif; ?>
 <?php else: ?>
 <div class="standalone-shell">
-    <?php if ($flash): ?>
+    <?php if ($flash && !$deferFlashInPage): ?>
         <div style="max-width: 1080px; width: 100%; margin: 12px auto 0; padding: 0 24px;">
             <div class="alert <?= e($flash['type']) ?>">
                 <div class="alert-body"><?= e($flash['message']) ?></div>

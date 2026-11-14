@@ -3,23 +3,83 @@
  * LOG KEAMANAN - Adminator 2026 Redesign Audit Trail (Fitur 5)
  * Hijau = Normal | Merah = Fraud / Anomali
  */
-require_auth();
+require_role(['superadmin', 'banwasra']);
 require_once BASE_PATH . '/models/log_model.php';
 require_once BASE_PATH . '/models/bilik_model.php';
 
 $pdo = get_db_connection();
-$pageTitle = 'Log Keamanan';
-$logs = get_audit_logs($pdo, null, null, '', 300);
-$logStats = get_audit_log_stats($pdo);
-$bilikList = get_all_biliks($pdo);
+$activeTab = strtolower(trim((string) ($_GET['tab'] ?? $_GET['category'] ?? 'all')));
+if (!in_array($activeTab, ['all', 'pemilih', 'admin'], true)) {
+    $activeTab = 'all';
+}
+$categoryFilter = $activeTab === 'all' ? null : $activeTab;
+
+$pageTitle = match ($activeTab) {
+    'pemilih' => 'Log Pemilih',
+    'admin'   => 'Log Admin',
+    default   => 'Log Keamanan',
+};
+
+$excludeSuperadmin = is_banwasra();
+$logs = get_audit_logs($pdo, null, null, '', 300, $excludeSuperadmin, $categoryFilter);
+$logStats = get_audit_log_stats($pdo, $excludeSuperadmin, $categoryFilter);
+$bilikList = get_all_biliks_sanitized($pdo, true, $excludeSuperadmin);
+
+$exportParams = ['sub_action' => 'export_csv'];
+if ($categoryFilter !== null) {
+    $exportParams['category'] = $categoryFilter;
+}
+
+$tabSummaryLabel = match ($activeTab) {
+    'pemilih' => 'Aktivitas bilik & verifikasi pemilih',
+    'admin'   => $excludeSuperadmin
+        ? 'Aktivitas manajemen KPRM & Banwasra'
+        : 'Aktivitas manajemen Superadmin, KPRM & Banwasra',
+    default   => 'Pemilih: ' . number_format($logStats['total_pemilih']) . ' · Admin: ' . number_format($logStats['total_admin']),
+};
+
+$searchPlaceholder = match ($activeTab) {
+    'pemilih' => 'Cari NIM, nama pemilih, kode event, atau Device ID...',
+    'admin'   => 'Cari username aktor, role, kode event, atau keterangan...',
+    default   => 'Cari NIM, aktor, kode event, keterangan, atau Device ID...',
+};
+
+$actorColumnLabel = match ($activeTab) {
+    'pemilih' => 'Pemilih (NIM / Nama)',
+    'admin'   => 'Pengguna Manajemen / Role',
+    default   => 'Aktor / Pemilih',
+};
 
 require BASE_PATH . '/views/layouts/header.php';
 ?>
 
-<section class="hero">
+<section class="hero" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:14px;">
+    <div class="tabs pills" role="tablist" aria-label="Kategori Log Audit">
+        <a href="<?= e(route_url('log_keamanan')) ?>"
+           class="tab <?= $activeTab === 'all' ? 'is-active' : '' ?>"
+           style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+            <span>Semua Log</span>
+            <span class="badge neutral"><?= number_format($logStats['total_all']) ?></span>
+        </a>
+        <a href="<?= e(route_url('log_keamanan', ['tab' => 'pemilih'])) ?>"
+           class="tab <?= $activeTab === 'pemilih' ? 'is-active' : '' ?>"
+           style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+            <span>Log Pemilih</span>
+            <span class="badge info"><?= number_format($logStats['total_pemilih']) ?></span>
+        </a>
+        <a href="<?= e(route_url('log_keamanan', ['tab' => 'admin'])) ?>"
+           class="tab <?= $activeTab === 'admin' ? 'is-active' : '' ?>"
+           style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+            <span>Log Admin</span>
+            <span class="badge purple"><?= number_format($logStats['total_admin']) ?></span>
+        </a>
+    </div>
     <div class="hero-actions">
+        <?php if ($excludeSuperadmin): ?>
+            <span class="badge purple dot">Pengawasan Banwasra · Non-Superadmin Log</span>
+        <?php endif; ?>
         <button type="button" class="btn btn--soft-primary btn--sm" id="btnToggleLiveLog" data-live="1">Live Sync: ON (2s)</button>
-        <a href="<?= e(action_url('log', ['sub_action' => 'export_csv'])) ?>" class="btn btn--soft-primary btn--sm">Export CSV</a>
+        <a href="<?= e(action_url('log', $exportParams)) ?>" class="btn btn--soft-primary btn--sm">Export CSV</a>
         <button type="button" class="btn btn--ghost btn--sm" onclick="PemiraApp.syncCurrentPage()">Sinkronkan Sekarang</button>
     </div>
 </section>
@@ -28,11 +88,11 @@ require BASE_PATH . '/views/layouts/header.php';
 <div class="kpi-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
     <div class="kpi-card">
         <div class="kpi-top">
-            <span class="kpi-label">Total Event Terekam</span>
-            <span class="kpi-pill info">Audit</span>
+            <span class="kpi-label"><?= e($activeTab === 'pemilih' ? 'Total Log Pemilih' : ($activeTab === 'admin' ? 'Total Log Admin' : 'Total Event Terekam')) ?></span>
+            <span class="kpi-pill info"><?= e($activeTab === 'pemilih' ? 'Pemilih' : ($activeTab === 'admin' ? 'Manajemen' : 'Audit')) ?></span>
         </div>
         <div class="kpi-value" id="kpiTotalLogs"><?= number_format($logStats['total_logs']) ?></div>
-        <div class="kpi-compare"><span>Seluruh aktivitas sistem</span></div>
+        <div class="kpi-compare"><span><?= e($tabSummaryLabel) ?></span></div>
     </div>
     <div class="kpi-card">
         <div class="kpi-top">
@@ -40,7 +100,7 @@ require BASE_PATH . '/views/layouts/header.php';
             <span class="kpi-pill up">Valid</span>
         </div>
         <div class="kpi-value" id="kpiTotalNormal"><?= number_format($logStats['total_normal']) ?></div>
-        <div class="kpi-compare"><span>Suara sah & scan QR valid</span></div>
+        <div class="kpi-compare"><span><?= e($activeTab === 'admin' ? 'Operasi panel & login manajemen sah' : 'Suara sah & aktivitas tervalidasi') ?></span></div>
     </div>
     <div class="kpi-card">
         <div class="kpi-top">
@@ -48,7 +108,7 @@ require BASE_PATH . '/views/layouts/header.php';
             <span class="kpi-pill down">Alert</span>
         </div>
         <div class="kpi-value" id="kpiTotalFraud"><?= number_format($logStats['total_fraud']) ?></div>
-        <div class="kpi-compare"><span>Double scan, foto QR & NIM ulang</span></div>
+        <div class="kpi-compare"><span><?= e($activeTab === 'admin' ? 'Login gagal & pemblokiran brute-force' : 'Double scan, foto QR & anomali akses') ?></span></div>
     </div>
 </div>
 
@@ -82,19 +142,39 @@ require BASE_PATH . '/views/layouts/header.php';
             <div class="data-toolbar-left">
                 <div class="input-icon" style="flex:1;max-width:340px;">
                     <span class="ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
-                    <input type="search" class="input" id="logSearchInput" data-dt-search placeholder="Cari kode event, keterangan, NIM, atau Device ID...">
+                    <input type="search" class="input" id="logSearchInput" data-dt-search placeholder="<?= e($searchPlaceholder) ?>">
                 </div>
             </div>
             <div class="data-toolbar-right">
-                <select class="select" data-dt-filter="data-bilik" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
-                    <option value="ALL">Semua Bilik</option>
-                    <?php foreach ($bilikList as $b): ?>
-                        <option value="<?= e($b['nama_bilik']) ?>"><?= e($b['nama_bilik']) ?> (#<?= (int) $b['nomor_bilik'] ?>)</option>
-                    <?php endforeach; ?>
-                    <option value="TANPA_BILIK">Tanpa Bilik / Global</option>
-                </select>
+                <?php if ($activeTab === 'all'): ?>
+                    <select class="select" data-dt-filter="data-log-cat" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
+                        <option value="ALL">Semua Jenis Log</option>
+                        <option value="pemilih">Log Pemilih</option>
+                        <option value="admin">Log Admin (Manajemen)</option>
+                    </select>
+                <?php endif; ?>
+                <?php if ($activeTab !== 'pemilih'): ?>
+                    <select class="select" data-dt-filter="data-actor-role" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
+                        <option value="ALL">Semua Role Manajemen</option>
+                        <?php if (!$excludeSuperadmin): ?>
+                            <option value="superadmin">Superadmin</option>
+                        <?php endif; ?>
+                        <option value="kprm">KPRM</option>
+                        <option value="banwasra">Banwasra</option>
+                        <option value="guest">Gagal Login / Tamu</option>
+                    </select>
+                <?php endif; ?>
+                <?php if ($activeTab !== 'admin'): ?>
+                    <select class="select" data-dt-filter="data-bilik" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
+                        <option value="ALL">Semua Bilik</option>
+                        <?php foreach ($bilikList as $b): ?>
+                            <option value="<?= e($b['nama_bilik']) ?>"><?= e($b['nama_bilik']) ?> (#<?= (int) $b['nomor_bilik'] ?>)</option>
+                        <?php endforeach; ?>
+                        <option value="TANPA_BILIK">Tanpa Bilik / Global</option>
+                    </select>
+                <?php endif; ?>
                 <select class="select" data-dt-filter="data-kategori" style="width:auto;padding:6px 28px 6px 10px;font-size:12px;">
-                    <option value="ALL">Semua Kategori</option>
+                    <option value="ALL">Semua Status</option>
                     <option value="NORMAL">Normal (Hijau)</option>
                     <option value="FRAUD">Fraud / Anomali (Merah)</option>
                 </select>
@@ -112,9 +192,10 @@ require BASE_PATH . '/views/layouts/header.php';
                     <tr>
                         <th data-sort>Waktu <span class="sort">▾</span></th>
                         <th data-sort>Status <span class="sort">▾</span></th>
+                        <th data-sort>Jenis <span class="sort">▾</span></th>
                         <th data-sort>Kode Event <span class="sort">▾</span></th>
                         <th>Keterangan Aktivitas</th>
-                        <th data-sort>NIM / Mahasiswa <span class="sort">▾</span></th>
+                        <th data-sort><?= e($actorColumnLabel) ?> <span class="sort">▾</span></th>
                         <th data-sort>Bilik <span class="sort">▾</span></th>
                         <th>Device / IP</th>
                     </tr>
@@ -123,10 +204,21 @@ require BASE_PATH . '/views/layouts/header.php';
                     <?php foreach ($logs as $log): ?>
                         <?php
                         $isFraud = ($log['status_log'] === 'FRAUD');
+                        $logCategory = ($log['log_category'] ?? 'pemilih') === 'admin' ? 'admin' : 'pemilih';
+                        $actorRoleRaw = strtolower((string) ($log['actor_role'] ?? ''));
+                        $actorRoleAttr = $actorRoleRaw !== '' ? $actorRoleRaw : ($logCategory === 'admin' ? 'guest' : 'pemilih');
                         $bilikAttr = !empty($log['nama_bilik']) ? $log['nama_bilik'] : 'TANPA_BILIK';
+                        $roleBadgeClass = match ($actorRoleRaw) {
+                            'superadmin' => 'danger',
+                            'kprm'       => 'primary',
+                            'banwasra'   => 'purple',
+                            default      => 'warning',
+                        };
                         ?>
                         <tr class="data-row <?= $isFraud ? 'row-log-fraud' : 'row-log-normal' ?>"
                             data-kategori="<?= e($log['status_log']) ?>"
+                            data-log-cat="<?= e($logCategory) ?>"
+                            data-actor-role="<?= e($actorRoleAttr) ?>"
                             data-bilik="<?= e($bilikAttr) ?>">
                             <td><span class="data-cell-mono"><?= e(format_tanggal_indo($log['created_at'])) ?></span></td>
                             <td>
@@ -135,13 +227,32 @@ require BASE_PATH . '/views/layouts/header.php';
                                 </span>
                             </td>
                             <td>
+                                <span class="badge <?= $logCategory === 'admin' ? 'purple' : 'info' ?>">
+                                    <?= $logCategory === 'admin' ? 'ADMIN' : 'PEMILIH' ?>
+                                </span>
+                            </td>
+                            <td>
                                 <div class="data-cell-mono fw-600"><?= e($log['kode_event']) ?></div>
                                 <div class="text-muted" style="font-size:11px;"><?= e($log['judul_event']) ?></div>
                             </td>
                             <td><?= e($log['keterangan']) ?></td>
                             <td>
-                                <div class="data-cell-mono fw-600"><?= e($log['nim'] ?: '-') ?></div>
-                                <div class="text-muted" style="font-size:11px;"><?= e($log['nama_mahasiswa'] ?: '') ?></div>
+                                <?php if ($logCategory === 'admin'): ?>
+                                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                        <span class="data-cell-mono fw-600"><?= e($log['actor_username'] ?: '-') ?></span>
+                                        <span class="badge <?= $roleBadgeClass ?>">
+                                            <?= e($actorRoleRaw !== '' ? strtoupper($actorRoleRaw) : 'GAGAL LOGIN') ?>
+                                        </span>
+                                    </div>
+                                    <?php if (!empty($log['nim'])): ?>
+                                        <div class="text-muted data-cell-mono" style="font-size:11px;margin-top:2px;">Target NIM: <?= e($log['nim']) ?></div>
+                                    <?php endif; ?>
+                                <?php elseif (!empty($log['nim'])): ?>
+                                    <div class="data-cell-mono fw-600"><?= e($log['nim']) ?></div>
+                                    <div class="text-muted" style="font-size:11px;"><?= e($log['nama_mahasiswa'] ?: '') ?></div>
+                                <?php else: ?>
+                                    <span class="text-muted">Anonim / Pra-Verifikasi</span>
+                                <?php endif; ?>
                             </td>
                             <td><span class="data-cell-mono"><?= e($log['nama_bilik'] ?: '-') ?></span></td>
                             <td>

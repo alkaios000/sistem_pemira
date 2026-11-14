@@ -1,7 +1,7 @@
 <?php
 /**
  * Konfigurasi Global & Inisialisasi Sistem
- * Memuat variabel .env, mengatur timezone, session, dan koneksi PDO MySQL.
+ * Memuat variabel .env, mengatur timezone, session terproteksi, dan koneksi PDO MySQL.
  */
 
 if (!defined('BASE_PATH')) {
@@ -43,13 +43,34 @@ load_env_file(BASE_PATH . '/.env');
  */
 function env_val(string $key, mixed $default = null): mixed
 {
-    return $_ENV[$key] ?? getenv($key) ?: $default;
+    $val = $_ENV[$key] ?? getenv($key);
+    if ($val === false || $val === null || $val === '') {
+        return $default;
+    }
+    return $val;
+}
+
+/**
+ * Mendeteksi apakah request berjalan di atas HTTPS
+ */
+function is_https_request(): bool
+{
+    if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
+        return true;
+    }
+    if ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443') {
+        return true;
+    }
+    if (strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https') {
+        return true;
+    }
+    return false;
 }
 
 // Konfigurasi zona waktu lokal Indonesia
 date_default_timezone_set('Asia/Jakarta');
 
-// Pengaturan Error Reporting berdasarkan mode APP_DEBUG
+// Pengaturan Error Reporting berdasarkan mode APP_DEBUG (default aman: mati)
 $is_debug = filter_var(env_val('APP_DEBUG', false), FILTER_VALIDATE_BOOLEAN);
 if ($is_debug) {
     ini_set('display_errors', '1');
@@ -59,11 +80,19 @@ if ($is_debug) {
     error_reporting(0);
 }
 
+// Kirim HSTS hanya saat HTTPS aktif
+if (PHP_SAPI !== 'cli' && is_https_request() && !headers_sent()) {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
+
 // Inisialisasi Session yang aman
-if (session_status() === PHP_SESSION_NONE) {
+if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
     session_set_cookie_params([
         'lifetime' => 0,
         'path'     => '/',
+        'secure'   => is_https_request(),
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
@@ -86,6 +115,7 @@ function get_db_connection(): PDO
     $dbname = env_val('DB_DATABASE', 'db_sistem_pemira');
     $username = env_val('DB_USERNAME', 'root');
     $password = env_val('DB_PASSWORD', '');
+    $isLocalEnv = strtolower((string) env_val('APP_ENV', 'production')) === 'local';
 
     $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
 
@@ -96,14 +126,15 @@ function get_db_connection(): PDO
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]);
 
-        // Cek apakah tabel dasar sudah tersedia; jika belum, jalankan auto-migrasi awal
-        $stmt_check = $pdo->query("SHOW TABLES LIKE 'users'");
-        if ($stmt_check->rowCount() === 0) {
-            bootstrap_database_schema($pdo);
+        // Auto-bootstrap hanya diizinkan pada lingkungan local bila tabel belum tersedia
+        if ($isLocalEnv) {
+            $stmt_check = $pdo->query("SHOW TABLES LIKE 'users'");
+            if ($stmt_check->rowCount() === 0) {
+                bootstrap_database_schema($pdo);
+            }
         }
     } catch (PDOException $exception) {
-        // Jika database belum dibuat (kode error 1049), buat database dan jalankan migrasi otomatis
-        if ((int) $exception->getCode() === 1049 || str_contains($exception->getMessage(), 'Unknown database')) {
+        if ($isLocalEnv && ((int) $exception->getCode() === 1049 || str_contains($exception->getMessage(), 'Unknown database'))) {
             try {
                 $pdo_init = new PDO("mysql:host={$host};port={$port};charset=utf8mb4", $username, $password, [
                     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -121,8 +152,8 @@ function get_db_connection(): PDO
         }
 
         error_log('Database Connection Error: ' . $exception->getMessage());
-        if (filter_var(env_val('APP_DEBUG', false), FILTER_VALIDATE_BOOLEAN)) {
-            die('Gagal terhubung ke basis data MySQL. Pastikan layanan MySQL pada Laragon sedang berjalan. Detail: ' . htmlspecialchars($exception->getMessage(), ENT_QUOTES, 'UTF-8'));
+        if ($isLocalEnv && filter_var(env_val('APP_DEBUG', false), FILTER_VALIDATE_BOOLEAN)) {
+            die('Gagal terhubung ke basis data MySQL. Pastikan layanan MySQL sedang berjalan. Detail: ' . htmlspecialchars($exception->getMessage(), ENT_QUOTES, 'UTF-8'));
         }
         http_response_code(500);
         require BASE_PATH . '/views/errors/500.php';
@@ -133,7 +164,7 @@ function get_db_connection(): PDO
 }
 
 /**
- * Menjalankan migrasi SQL dan seeder awal secara otomatis saat basis data masih kosong
+ * Menjalankan migrasi SQL dan seeder awal saat basis data kosong (khusus instalasi local / CLI)
  */
 function bootstrap_database_schema(PDO $pdo): void
 {

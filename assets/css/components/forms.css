@@ -178,7 +178,7 @@
     color: #b45309;
 }
 
-.alert.danger, .alert-danger {
+.alert.danger, .alert-danger, .alert.error, .alert-error {
     background: var(--danger-soft);
     border-color: rgba(239, 68, 68, 0.22);
     color: #b91c1c;
