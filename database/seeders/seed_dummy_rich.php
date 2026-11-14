@@ -459,8 +459,8 @@ function run_rich_dummy_seeder(PDO $pdo): array
         ];
 
         $stmtBilik = $pdo->prepare('
-            INSERT INTO bilik_suaras (nomor_bilik, nama_bilik, lokasi_bilik, status_bilik, current_token, token_generated_at, last_vote_at, total_suara_bilik)
-            VALUES (:nomor_bilik, :nama_bilik, :lokasi_bilik, :status_bilik, :current_token, :token_gen, :last_vote_at, :total_suara_bilik)
+            INSERT INTO bilik_suaras (nomor_bilik, nama_bilik, lokasi_bilik, status_bilik, current_token, kiosk_token, token_generated_at, last_vote_at, total_suara_bilik)
+            VALUES (:nomor_bilik, :nama_bilik, :lokasi_bilik, :status_bilik, :current_token, :kiosk_token, :token_gen, :last_vote_at, :total_suara_bilik)
         ');
 
         $bilikIds = [];
@@ -472,6 +472,7 @@ function run_rich_dummy_seeder(PDO $pdo): array
                 ':lokasi_bilik'      => 'Aula Utama Kampus',
                 ':status_bilik'      => $b['status'],
                 ':current_token'     => bin2hex(random_bytes(24)),
+                ':kiosk_token'       => bin2hex(random_bytes(32)),
                 ':token_gen'         => date('Y-m-d H:i:s', $now - 600),
                 ':last_vote_at'      => date('Y-m-d H:i:s', $now - $b['last_offset']),
                 ':total_suara_bilik' => $b['suara'],

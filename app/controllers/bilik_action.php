@@ -136,6 +136,27 @@ try {
         redirect(route_url('portal_qr'));
     }
 
+    if ($sub_action === 'rotate_kiosk_key') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $existing = $id > 0 ? find_bilik_by_id($pdo, $id) : null;
+        if (!$existing) {
+            set_flash('danger', 'Data bilik suara tidak ditemukan.');
+            redirect(route_url('portal_qr'));
+        }
+
+        rotate_bilik_kiosk_token($pdo, $id);
+        record_admin_audit_log(
+            $pdo,
+            'BILIK_ROTATE_KIOSK_KEY',
+            'Rotasi Kunci Akses Layar Bilik',
+            "Operator {$_SESSION['username']} memutar kunci akses kiosk untuk {$existing['nama_bilik']} (#0{$existing['nomor_bilik']}). Sesi layar bilik lama dicabut.",
+            'NORMAL',
+            $id
+        );
+        set_flash('success', "Kunci akses layar kiosk {$existing['nama_bilik']} berhasil diputar. Tautan kiosk lama otomatis tidak berlaku.");
+        redirect(route_url('portal_qr', ['booth' => (int) $existing['nomor_bilik']]));
+    }
+
     if ($sub_action === 'toggle_global_portal') {
         $portal_status = ($_POST['portal_status'] ?? 'BUKA') === 'TUTUP' ? 'TUTUP' : 'BUKA';
         update_setting_value($pdo, 'status_portal_global', $portal_status);

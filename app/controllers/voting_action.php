@@ -79,6 +79,52 @@ if ($sub_action === 'poll_portal_qr') {
 }
 
 /**
+ * 1A-2. Endpoint Polling Khusus Layar Kiosk Per Bilik (Terkunci ke 1 Bilik via kiosk_token atau Pratinjau Staf)
+ * Tidak membocorkan daftar bilik lain, NIM tersamarkan, jumlah suara, maupun kunci kiosk.
+ */
+if ($sub_action === 'poll_kiosk_qr') {
+    header('Cache-Control: no-store, no-cache, must-revalidate, private');
+    header('Referrer-Policy: no-referrer');
+
+    $nomor_bilik = (int) ($_GET['booth'] ?? 0);
+    $bilik = $nomor_bilik >= 1 ? find_bilik_by_nomor($pdo, $nomor_bilik) : null;
+    if (!$bilik) {
+        json_response(false, 'Nomor bilik suara tidak ditemukan.', ['revoked' => true], 404);
+    }
+
+    $hasKioskGrant = verify_bilik_kiosk_session($pdo, $bilik);
+    $hasStaffPreview = is_authenticated() && in_array(current_user_role(), ['superadmin', 'kprm', 'banwasra'], true);
+
+    if (!$hasKioskGrant && !$hasStaffPreview) {
+        unset($_SESSION['kiosk_booth_access'][(int) $bilik['id']]);
+        json_response(false, 'Sesi layar bilik tidak sah atau kunci akses telah diputar oleh panitia.', ['revoked' => true], 403);
+    }
+
+    $global_portal = get_setting_value($pdo, 'status_portal_global', 'BUKA');
+    $bilik = rotate_or_get_bilik_token($pdo, $nomor_bilik, $qr_ttl, false);
+    $effective_status = ($global_portal !== 'BUKA') ? 'CLOSED' : $bilik['status_bilik'];
+    $scan_url = route_url('bilik_pemilihan', [
+        'booth' => (int) $bilik['nomor_bilik'],
+        'token' => $bilik['current_token'],
+    ]);
+
+    json_response(true, 'Status bilik diperbarui.', [
+        'nomor_bilik'            => (int) $bilik['nomor_bilik'],
+        'nama_bilik'             => $bilik['nama_bilik'],
+        'lokasi_bilik'           => $bilik['lokasi_bilik'],
+        'status_bilik'           => $effective_status,
+        'global_portal'          => $global_portal,
+        'qr_token'               => $effective_status === 'IDLE' ? $bilik['current_token'] : null,
+        'scan_url'               => $effective_status === 'IDLE' ? $scan_url : null,
+        'qr_ttl_seconds'         => $qr_ttl,
+        'remaining_qr_seconds'   => (int) $bilik['remaining_qr_seconds'],
+        'remaining_lock_seconds' => ($effective_status === 'IN_USE' && !empty($bilik['locked_until']))
+            ? max(0, strtotime($bilik['locked_until']) - time())
+            : 0,
+    ]);
+}
+
+/**
  * 1B. Rotasi Paksa Token QR Bilik Secara Manual via POST + CSRF (Hanya Superadmin & KPRM)
  */
 if ($sub_action === 'force_rotate_qr') {
@@ -157,17 +203,20 @@ if ($sub_action === 'claim_qr_scan') {
     $client_device_token = preg_replace('/[^a-zA-Z0-9_\-]/', '', trim((string) ($_POST['device_id'] ?? '')));
     $fingerprint_hash = preg_replace('/[^a-zA-Z0-9_\-]/', '', trim((string) ($_POST['fingerprint_hash'] ?? 'unknown_fp')));
 
-    if ($client_device_token === '') {
-        $client_device_token = 'dev_' . substr(hash('sha256', $browser_session_id . '|' . $fingerprint_hash), 0, 24);
+    $restored_existing = restore_active_voting_session($pdo);
+    $verified_cookie_device = get_verified_device_cookie();
+    $can_resume_owned_booth = false;
+
+    if ($verified_cookie_device !== null) {
+        $client_device_token = $verified_cookie_device;
+        $can_resume_owned_booth = true;
+    } elseif ($restored_existing && !empty($restored_existing['device_id'])) {
+        $client_device_token = (string) $restored_existing['device_id'];
+        $can_resume_owned_booth = true;
     }
 
-    // Jika cookie browser terautentikasi HMAC menandakan perangkat sudah memilih, paksa pencocokan device_id lama
-    if (!empty($_COOKIE['pemira_voted_device'])) {
-        $cookie_dev = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $_COOKIE['pemira_voted_device']);
-        $cookie_sig = isset($_COOKIE['pemira_voted_sig']) ? (string) $_COOKIE['pemira_voted_sig'] : null;
-        if ($cookie_dev !== '' && verify_hmac_value($cookie_dev, $cookie_sig)) {
-            $client_device_token = $cookie_dev;
-        }
+    if ($client_device_token === '') {
+        $client_device_token = 'dev_' . substr(hash('sha256', $browser_session_id . '|' . $fingerprint_hash), 0, 24);
     }
 
     $result = claim_qr_token_for_device(
@@ -179,19 +228,23 @@ if ($sub_action === 'claim_qr_scan') {
         $browser_session_id,
         $ip,
         get_client_user_agent(),
-        $session_ttl
+        $session_ttl,
+        $can_resume_owned_booth
     );
 
     if (!$result['status']) {
         record_rate_limit_hit($pdo, 'voting_claim_fail', $ip, 25, 120, 120);
         json_response(false, $result['message'], [
-            'kode_error' => $result['kode_error'] ?? 'CLAIM_FAILED',
+            'kode_error'         => $result['kode_error'] ?? 'CLAIM_FAILED',
+            'active_nomor_bilik' => $result['active_nomor_bilik'] ?? null,
         ]);
     }
 
     clear_rate_limit($pdo, 'voting_claim_fail', $ip);
 
-    // Simpan sesi voting aktif di PHP session pemilih (server-side anti-hijack binding)
+    $active_mhs = $result['active_mahasiswa'] ?? null;
+
+    // Simpan sesi voting aktif di PHP session & cookie persisten terproteksi HMAC (tahan restart browser)
     $_SESSION['active_voting_session'] = [
         'bilik_id'             => $result['bilik_id'],
         'nomor_bilik'          => $result['nomor_bilik'],
@@ -200,8 +253,19 @@ if ($sub_action === 'claim_qr_scan') {
         'device_id'            => $client_device_token,
         'device_session_id'    => $result['device_session_id'] ?? null,
         'fingerprint_hash'     => $fingerprint_hash,
-        'verified_nim'         => $result['active_nim'] ?? null,
+        'verified_nim'         => $active_mhs['nim'] ?? null,
+        'verified_nama'        => $active_mhs['nama_lengkap'] ?? null,
+        'verified_kelas'       => $active_mhs['nama_kelas'] ?? null,
+        'verified_jurusan'     => $active_mhs['jurusan'] ?? null,
     ];
+
+    issue_device_identity_cookies($client_device_token);
+    issue_active_voting_resume_cookie(
+        (int) $result['bilik_id'],
+        (string) $result['voting_session_token'],
+        $client_device_token,
+        $session_ttl
+    );
 
     json_response(true, $result['message'], [
         'bilik_id'             => $result['bilik_id'],
@@ -210,6 +274,8 @@ if ($sub_action === 'claim_qr_scan') {
         'voting_session_token' => $result['voting_session_token'],
         'device_id'            => $client_device_token,
         'session_ttl_seconds'  => $session_ttl,
+        'next_step'            => $active_mhs ? 3 : 2,
+        'verified_mahasiswa'   => $active_mhs,
     ]);
 }
 
@@ -238,8 +304,8 @@ if ($sub_action === 'verify_nim') {
         json_response(false, 'Silakan masukkan Nomor Induk Mahasiswa (NIM) Anda terlebih dahulu.');
     }
 
-    // Validasi ikatan PHP session server-side pemilik scan QR
-    $sess = $_SESSION['active_voting_session'] ?? null;
+    // Validasi / pulihkan ikatan sesi server-side pemilik scan QR
+    $sess = restore_active_voting_session($pdo);
     if (
         !is_array($sess)
         || (int) ($sess['bilik_id'] ?? 0) !== $bilik_id
@@ -282,6 +348,7 @@ if ($sub_action === 'verify_nim') {
         record_rate_limit_hit($pdo, 'voting_nim_fail', $ip, 20, 120, 120);
         if (!empty($verify['session_dead'])) {
             unset($_SESSION['active_voting_session']);
+            clear_active_voting_resume_cookie();
         }
         json_response(false, $verify['message'], [
             'kode_error'   => $verify['kode_error'] ?? 'VERIFY_FAILED',
@@ -321,7 +388,7 @@ if ($sub_action === 'confirm_vote') {
         json_response(false, 'Anda wajib memilih 1 Calon Presiden BEM dan 1 Calon Ketua Umum BPM sebelum mengonfirmasi suara.');
     }
 
-    $sess = $_SESSION['active_voting_session'] ?? null;
+    $sess = restore_active_voting_session($pdo);
     if (
         !is_array($sess)
         || (int) ($sess['bilik_id'] ?? 0) !== $bilik_id
@@ -368,23 +435,12 @@ if ($sub_action === 'confirm_vote') {
         ]);
     }
 
-    // Tanam cookie HMAC penanda device sudah memilih (berlaku 30 hari) & bersihkan sesi bilik aktif
-    $cookie_expiry = time() + (86400 * 30);
-    $is_secure = is_https_request();
-    setcookie('pemira_voted_device', $device_id, [
-        'expires'  => $cookie_expiry,
-        'path'     => '/',
-        'secure'   => $is_secure,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-    setcookie('pemira_voted_sig', sign_hmac_value($device_id), [
-        'expires'  => $cookie_expiry,
-        'path'     => '/',
-        'secure'   => $is_secure,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
+    // Tanam cookie HMAC penanda device sudah memilih (berlaku 30 hari) & hapus sesi aktif
+    $voted_ttl = 86400 * 30;
+    set_voting_cookie('pemira_voted_device', $device_id, $voted_ttl);
+    set_voting_cookie('pemira_voted_sig', sign_hmac_value($device_id), $voted_ttl);
+    issue_device_identity_cookies($device_id);
+    clear_active_voting_resume_cookie();
     unset($_SESSION['active_voting_session']);
 
     json_response(true, $vote_res['message']);

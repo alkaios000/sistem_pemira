@@ -1,11 +1,16 @@
 /**
  * VOTING_CLIENT.JS - Adminator 2026 Redesign Bilik Pemilihan Client Engine
- * Mendukung pemindai kamera QR (html5-qrcode), pemulihan sesi otomatis saat refresh, dan transaksi atomik.
+ * Mendukung deteksi bilik otomatis tanpa memilih bilik/menampilkan token,
+ * auto-lanjut ke verifikasi NIM, pemulihan sesi persisten, dan transaksi atomik.
  */
 let html5QrScanner = null;
+let isCameraStarting = false;
+let isClaimingQr = false;
+let isVerifyingNim = false;
+
 let votingState = {
     bilikId: 0,
-    nomorBilik: 1,
+    nomorBilik: 0,
     sessionToken: '',
     deviceId: '',
     fingerprintHash: '',
@@ -38,56 +43,155 @@ function getOrCreateDeviceIdentity() {
     votingState.fingerprintHash = fpHash;
 }
 
-function showVotingStep(step) {
-    document.getElementById('panelStep1').style.display = (step === 1) ? 'flex' : 'none';
-    document.getElementById('panelStep2').style.display = (step === 2) ? 'flex' : 'none';
-    document.getElementById('panelStep3').style.display = (step === 3) ? 'block' : 'none';
-    const p4 = document.getElementById('panelStep4');
-    if (p4) p4.style.display = (step === 4) ? 'flex' : 'none';
+function setScannerUiState(mode, message = '', allowRetry = true) {
+    const idleView = document.getElementById('qrScanIdleView');
+    const processingBox = document.getElementById('qrAutoProcessing');
+    const processingText = document.getElementById('qrAutoProcessingText');
+    const errorBox = document.getElementById('qrScanErrorBox');
+    const errorMsg = document.getElementById('qrScanErrorMsg');
+    const retryBtn = document.getElementById('btnRetryQrScan');
 
-    const p1 = document.getElementById('stepPill1');
-    const p2 = document.getElementById('stepPill2');
-    const p3 = document.getElementById('stepPill3');
+    if (idleView) idleView.style.display = (mode === 'idle') ? 'block' : 'none';
+    if (processingBox) processingBox.style.display = (mode === 'processing') ? 'flex' : 'none';
+    if (processingText && message) processingText.textContent = message;
 
-    p1.className = 'step-pill ' + (step === 1 ? 'is-active' : 'is-done');
-    p2.className = 'step-pill ' + (step === 2 ? 'is-active' : (step > 2 ? 'is-done' : ''));
-    p3.className = 'step-pill ' + (step === 3 ? 'is-active' : (step > 3 ? 'is-done' : ''));
+    if (errorBox) errorBox.style.display = (mode === 'error') ? 'flex' : 'none';
+    if (errorMsg && mode === 'error') errorMsg.textContent = message;
+    if (retryBtn) retryBtn.style.display = allowRetry ? 'inline-flex' : 'none';
 }
 
-function startQrCamera() {
+function retryQrScan() {
+    setScannerUiState('idle');
+    startQrCamera(true);
+}
+
+function showVotingStep(step) {
+    const p1 = document.getElementById('panelStep1');
+    const p2 = document.getElementById('panelStep2');
+    const p3 = document.getElementById('panelStep3');
+    const p4 = document.getElementById('panelStep4');
+
+    if (p1) p1.style.display = (step === 1) ? 'flex' : 'none';
+    if (p2) p2.style.display = (step === 2) ? 'flex' : 'none';
+    if (p3) p3.style.display = (step === 3) ? 'block' : 'none';
+    if (p4) p4.style.display = (step === 4) ? 'flex' : 'none';
+
+    const pill1 = document.getElementById('stepPill1');
+    const pill2 = document.getElementById('stepPill2');
+    const pill3 = document.getElementById('stepPill3');
+
+    if (pill1) pill1.className = 'step-pill ' + (step === 1 ? 'is-active' : 'is-done');
+    if (pill2) pill2.className = 'step-pill ' + (step === 2 ? 'is-active' : (step > 2 ? 'is-done' : ''));
+    if (pill3) pill3.className = 'step-pill ' + (step === 3 ? 'is-active' : (step > 3 ? 'is-done' : ''));
+}
+
+function showCameraPermissionMessage(msg, showStartBtn = true) {
+    const msgEl = document.getElementById('qrCameraPermissionMsg');
+    const readerEl = document.getElementById('qrCameraReader');
+    const btnStart = document.getElementById('btnStartQrCamera');
+    const btnStop = document.getElementById('btnStopQrCamera');
+
+    if (readerEl) readerEl.style.display = 'none';
+    if (msgEl) {
+        msgEl.textContent = msg;
+        msgEl.style.display = msg ? 'block' : 'none';
+    }
+    if (btnStart) btnStart.style.display = showStartBtn ? 'inline-flex' : 'none';
+    if (btnStop) btnStop.style.display = 'none';
+}
+
+function startQrCamera(fromUserClick = false) {
+    if (isCameraStarting) return;
+
+    const readerEl = document.getElementById('qrCameraReader');
+    const btnStart = document.getElementById('btnStartQrCamera');
+    const btnStop = document.getElementById('btnStopQrCamera');
+    const msgEl = document.getElementById('qrCameraPermissionMsg');
+    if (!readerEl) return;
+
     if (typeof Html5Qrcode === 'undefined') {
-        PemiraApp.toast('Pustaka kamera QR tidak tersedia. Gunakan link atau input token.', 'warning');
+        showCameraPermissionMessage('Pustaka kamera QR tidak tersedia. Gunakan kamera bawaan ponsel untuk memindai QR Code pada layar bilik.', false);
         return;
     }
-    const readerEl = document.getElementById('qrCameraReader');
-    if (!readerEl) return;
+
+    if (!window.isSecureContext || !navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        showCameraPermissionMessage('Akses kamera langsung di browser memerlukan koneksi HTTPS atau localhost. Anda dapat memindai QR Code memakai aplikasi kamera ponsel.', false);
+        return;
+    }
+
+    setScannerUiState('idle');
+    if (msgEl) {
+        msgEl.textContent = '';
+        msgEl.style.display = 'none';
+    }
+    if (btnStart) btnStart.style.display = 'none';
+    if (btnStop) btnStop.style.display = 'none';
+
     readerEl.style.display = 'flex';
-    readerEl.innerHTML = '';
+    readerEl.innerHTML = '<span>Meminta izin akses kamera...</span>';
+
+    isCameraStarting = true;
+    const scanConfig = { fps: 10, qrbox: { width: 210, height: 210 } };
+    const onSuccess = decodedText => {
+        stopQrCamera();
+        handleDecodedQrText(decodedText);
+    };
+
+    const onStarted = () => {
+        isCameraStarting = false;
+        if (btnStart) btnStart.style.display = 'none';
+        if (btnStop) btnStop.style.display = 'inline-flex';
+    };
+
+    const onFailed = err => {
+        isCameraStarting = false;
+        html5QrScanner = null;
+        const errText = String(err || '');
+        const denied = /NotAllowedError|Permission|denied|dismissed/i.test(errText);
+        const msg = denied
+            ? 'Izin kamera belum diberikan. Izinkan akses kamera pada browser lalu tekan tombol di bawah untuk memindai QR bilik.'
+            : 'Kamera tidak terdeteksi atau sedang digunakan aplikasi lain. Pastikan izin kamera aktif lalu coba lagi.';
+        showCameraPermissionMessage(msg, true);
+        if (fromUserClick) {
+            PemiraApp.toast(msg, 'warning');
+        }
+    };
 
     html5QrScanner = new Html5Qrcode('qrCameraReader');
-    html5QrScanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 200, height: 200 } },
-        decodedText => {
-            stopQrCamera();
-            handleDecodedQrText(decodedText);
-        },
-        () => {}
-    ).then(() => {
-        document.getElementById('btnStartQrCamera').style.display = 'none';
-        document.getElementById('btnStopQrCamera').style.display = 'inline-flex';
-    }).catch(() => {
-        readerEl.style.display = 'none';
-        PemiraApp.toast('Kamera tidak dapat diakses. Gunakan link scan atau tempel token.', 'warning');
-    });
+    html5QrScanner.start({ facingMode: 'environment' }, scanConfig, onSuccess, () => {})
+        .then(onStarted)
+        .catch(err => {
+            const errText = String(err || '');
+            // Jika constraint kamera belakang ditolak (mis. webcam laptop), coba kamera pertama yang tersedia
+            if (/OverconstrainedError|NotFoundError|ConstraintNotSatisfied/i.test(errText)) {
+                Html5Qrcode.getCameras()
+                    .then(cameras => {
+                        if (!cameras || cameras.length === 0) {
+                            onFailed(err);
+                            return;
+                        }
+                        html5QrScanner = new Html5Qrcode('qrCameraReader');
+                        html5QrScanner.start(cameras[0].id, scanConfig, onSuccess, () => {})
+                            .then(onStarted)
+                            .catch(onFailed);
+                    })
+                    .catch(onFailed);
+                return;
+            }
+            onFailed(err);
+        });
 }
 
 function stopQrCamera() {
+    isCameraStarting = false;
     if (html5QrScanner) {
-        html5QrScanner.stop().then(() => {
-            html5QrScanner.clear();
-            html5QrScanner = null;
-        }).catch(() => {});
+        const currentScanner = html5QrScanner;
+        html5QrScanner = null;
+        try {
+            currentScanner.stop().then(() => {
+                currentScanner.clear();
+            }).catch(() => {});
+        } catch (_) {}
     }
     const readerEl = document.getElementById('qrCameraReader');
     if (readerEl) readerEl.style.display = 'none';
@@ -98,34 +202,41 @@ function stopQrCamera() {
 }
 
 function handleDecodedQrText(text) {
+    let detectedBooth = 0;
+    let detectedToken = '';
+
     try {
-        const url = new URL(text);
-        const boothParam = url.searchParams.get('booth');
-        const tokenParam = url.searchParams.get('token');
-        if (boothParam) {
-            const sel = document.getElementById('claimBoothSelect');
-            if (sel) sel.value = boothParam;
-        }
-        if (tokenParam) {
-            document.getElementById('claimTokenInput').value = tokenParam;
-            submitClaimQr();
-            return;
-        }
+        const url = new URL(text.trim());
+        const boothParam = parseInt(url.searchParams.get('booth') || '0', 10);
+        const tokenParam = (url.searchParams.get('token') || '').trim();
+        if (boothParam > 0) detectedBooth = boothParam;
+        if (tokenParam !== '') detectedToken = tokenParam;
     } catch (_) {
-        // Bukan URL, anggap string token langsung
+        detectedToken = String(text || '').trim();
     }
-    document.getElementById('claimTokenInput').value = text.trim();
-    submitClaimQr();
-}
 
-function submitClaimQr() {
-    const booth = document.getElementById('claimBoothSelect')?.value || 1;
-    const token = (document.getElementById('claimTokenInput')?.value || '').trim();
-
-    if (!token) {
-        PemiraApp.toast('Masukkan atau pindai token QR bilik terlebih dahulu.', 'warning');
+    if (!detectedToken) {
+        setScannerUiState('error', 'QR Code yang dipindai bukan merupakan QR Bilik PEMIRA yang valid.', true);
+        PemiraApp.toast('QR Code tidak dikenali.', 'warning');
         return;
     }
+
+    submitClaimQr(detectedBooth, detectedToken);
+}
+
+function submitClaimQr(boothNumber = 0, qrToken = '') {
+    const token = String(qrToken || '').trim();
+    const booth = parseInt(boothNumber, 10) || 0;
+
+    if (!token || isClaimingQr) {
+        if (!token) {
+            setScannerUiState('error', 'Data QR Bilik tidak valid. Silakan pindai ulang QR Code.', true);
+        }
+        return;
+    }
+
+    isClaimingQr = true;
+    setScannerUiState('processing', 'Mendeteksi bilik suara & mengamankan sesi Anda...');
 
     const formData = new FormData();
     formData.append('sub_action', 'claim_qr_scan');
@@ -141,33 +252,80 @@ function submitClaimQr() {
     })
         .then(res => res.json())
         .then(res => {
+            isClaimingQr = false;
             if (window.PemiraApp && typeof window.PemiraApp.broadcastSync === 'function') {
                 window.PemiraApp.broadcastSync('claim_qr');
             }
             if (!res.success) {
+                const errCode = res.data?.kode_error || '';
+                if (errCode === 'DEVICE_HAS_ACTIVE_SESSION') {
+                    PemiraApp.toast(res.message || 'Melanjutkan sesi bilik aktif Anda...', 'info');
+                    setTimeout(() => {
+                        window.location.href = `${window.PEMIRA_CONFIG.baseUrl}/index.php?page=bilik_pemilihan`;
+                    }, 500);
+                    return;
+                }
+                const allowRetry = errCode !== 'DOUBLE_SCAN_SAME_DEVICE';
+                setScannerUiState('error', res.message || 'Gagal mengklaim QR Code bilik.', allowRetry);
                 PemiraApp.toast(res.message || 'Gagal mengklaim QR Code bilik.', 'danger');
                 return;
             }
+
             const d = res.data;
             votingState.bilikId = d.bilik_id;
             votingState.nomorBilik = d.nomor_bilik;
             votingState.sessionToken = d.voting_session_token;
             votingState.deviceId = d.device_id || votingState.deviceId;
-            document.getElementById('lockedBoothLabel').textContent = d.nama_bilik || `Bilik #0${d.nomor_bilik}`;
+            if (votingState.deviceId) {
+                localStorage.setItem('pemira_device_id', votingState.deviceId);
+            }
+
+            const lockedLabel = document.getElementById('lockedBoothLabel');
+            if (lockedLabel) {
+                lockedLabel.textContent = d.nama_bilik || `Bilik #0${d.nomor_bilik}`;
+            }
+
+            if (d.next_step === 3 && d.verified_mahasiswa) {
+                const m = d.verified_mahasiswa;
+                votingState.verifiedNim = m.nim;
+                document.getElementById('voterInfoName').textContent = m.nama_lengkap;
+                document.getElementById('voterInfoSub').textContent = `NIM ${m.nim} · Kelas ${m.nama_kelas} (${m.jurusan})`;
+                PemiraApp.toast(res.message || 'Melanjutkan ke surat suara.', 'success');
+                showVotingStep(3);
+                return;
+            }
+
             PemiraApp.toast(res.message, 'success');
             showVotingStep(2);
-            document.getElementById('verifyNimInput')?.focus();
+            const nimInput = document.getElementById('verifyNimInput');
+            if (nimInput) {
+                nimInput.value = '';
+                nimInput.focus();
+            }
         })
         .catch(() => {
+            isClaimingQr = false;
+            setScannerUiState('error', 'Kesalahan jaringan saat menghubungi server bilik. Silakan coba pindai lagi.', true);
             PemiraApp.toast('Kesalahan jaringan saat mengklaim QR bilik.', 'danger');
         });
 }
 
 function submitVerifyNim() {
-    const nim = (document.getElementById('verifyNimInput')?.value || '').trim();
+    if (isVerifyingNim) return;
+
+    const nimInput = document.getElementById('verifyNimInput');
+    const nim = (nimInput?.value || '').trim();
     if (!nim) {
         PemiraApp.toast('Masukkan NIM Anda terlebih dahulu.', 'warning');
+        nimInput?.focus();
         return;
+    }
+
+    const btn = document.getElementById('btnVerifyNim');
+    isVerifyingNim = true;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Memverifikasi NIM...';
     }
 
     const formData = new FormData();
@@ -185,6 +343,11 @@ function submitVerifyNim() {
     })
         .then(res => res.json())
         .then(res => {
+            isVerifyingNim = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Verifikasi NIM & Buka Surat Suara →';
+            }
             if (window.PemiraApp && typeof window.PemiraApp.broadcastSync === 'function') {
                 window.PemiraApp.broadcastSync('verify_nim');
             }
@@ -205,6 +368,11 @@ function submitVerifyNim() {
             showVotingStep(3);
         })
         .catch(() => {
+            isVerifyingNim = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Verifikasi NIM & Buka Surat Suara →';
+            }
             PemiraApp.toast('Kesalahan jaringan saat memverifikasi NIM.', 'danger');
         });
 }
@@ -301,8 +469,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('votingRoot');
     if (!root) return;
 
+    const nimInput = document.getElementById('verifyNimInput');
+    if (nimInput) {
+        nimInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitVerifyNim();
+            }
+        });
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlBooth = parseInt(urlParams.get('booth') || '0', 10) || 0;
+    const urlToken = (urlParams.get('token') || '').trim();
+
+    if (urlToken !== '' && window.history && typeof window.history.replaceState === 'function') {
+        urlParams.delete('token');
+        urlParams.delete('booth');
+        const cleanQuery = urlParams.toString();
+        const cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '');
+        window.history.replaceState(null, document.title, cleanUrl);
+    }
+
+    if (document.getElementById('panelAlreadyVoted')) {
+        return;
+    }
+
     const sessBilikId = parseInt(root.getAttribute('data-session-bilik-id'), 10) || 0;
-    const sessNomorBilik = parseInt(root.getAttribute('data-session-nomor-bilik'), 10) || 1;
+    const sessNomorBilik = parseInt(root.getAttribute('data-session-nomor-bilik'), 10) || 0;
     const sessNamaBilik = root.getAttribute('data-session-nama-bilik') || '';
     const sessToken = root.getAttribute('data-session-token') || '';
     const sessDeviceId = root.getAttribute('data-session-device-id') || '';
@@ -311,13 +505,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const verifiedKelas = root.getAttribute('data-verified-kelas') || '';
     const verifiedJurusan = root.getAttribute('data-verified-jurusan') || '';
 
-    // Pemulihan sesi aktif saat halaman di-refresh
+    // Pemulihan sesi aktif saat refresh atau membuka kembali browser
     if (sessBilikId > 0 && sessToken !== '') {
         votingState.bilikId = sessBilikId;
         votingState.nomorBilik = sessNomorBilik;
         votingState.sessionToken = sessToken;
-        if (sessDeviceId) votingState.deviceId = sessDeviceId;
-        document.getElementById('lockedBoothLabel').textContent = sessNamaBilik || `Bilik #0${sessNomorBilik}`;
+        if (sessDeviceId) {
+            votingState.deviceId = sessDeviceId;
+            localStorage.setItem('pemira_device_id', sessDeviceId);
+        }
+        const lockedLabel = document.getElementById('lockedBoothLabel');
+        if (lockedLabel) {
+            lockedLabel.textContent = sessNamaBilik || `Bilik #0${sessNomorBilik}`;
+        }
 
         if (verifiedNim !== '') {
             votingState.verifiedNim = verifiedNim;
@@ -327,13 +527,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         showVotingStep(2);
+        nimInput?.focus();
         return;
     }
 
-    const urlBooth = parseInt(root.getAttribute('data-url-booth'), 10) || 0;
-    const urlToken = root.getAttribute('data-url-token') || '';
-
-    if (urlBooth > 0 && urlToken !== '') {
-        submitClaimQr();
+    if (urlToken !== '') {
+        submitClaimQr(urlBooth, urlToken);
+        return;
     }
+
+    // Otomatis minta izin & aktifkan kamera begitu halaman scanner terbuka pada Tahap 1
+    startQrCamera(false);
 });

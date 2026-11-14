@@ -54,10 +54,18 @@ $allowed_pages = [
     'profil_akun'         => BASE_PATH . '/views/pages/profil_akun.php',
     'log_keamanan'        => BASE_PATH . '/views/pages/log_keamanan.php',
     'portal_qr'           => BASE_PATH . '/views/pages/portal_qr.php',
+    'layar_bilik'         => BASE_PATH . '/views/pages/layar_bilik.php',
     'bilik_pemilihan'     => BASE_PATH . '/views/pages/bilik_pemilihan.php',
     'live_count_bem'      => BASE_PATH . '/views/pages/live_count_bem.php',
     'live_count_bpm'      => BASE_PATH . '/views/pages/live_count_bpm.php',
 ];
+
+if (!is_authenticated() && (!isset($_GET['page']) || $_GET['page'] === '') && !empty($_COOKIE['pemira_active_vote'])) {
+    require_once BASE_PATH . '/models/voting_model.php';
+    if (restore_active_voting_session(get_db_connection()) !== null) {
+        redirect(route_url('bilik_pemilihan'));
+    }
+}
 
 $default_page = is_authenticated() ? 'dashboard' : 'login';
 $requested_page = $_GET['page'] ?? $default_page;

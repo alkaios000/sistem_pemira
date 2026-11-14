@@ -22,6 +22,29 @@ $globalPortal = get_setting_value($pdo, 'status_portal_global', 'BUKA');
 $wajibCheckin = get_setting_value($pdo, 'wajib_checkin_panitia', '0');
 $liveCountPublik = get_setting_value($pdo, 'live_count_publik', 'BUKA');
 
+$kioskLinksMap = [];
+$selectedBilikId = 0;
+if ($canWrite) {
+    foreach (get_all_biliks($pdo) as $rawBilik) {
+        $bNum = (int) $rawBilik['nomor_bilik'];
+        $bTok = ensure_bilik_kiosk_token($pdo, $rawBilik);
+        $kioskLinksMap[$bNum] = [
+            'id'  => (int) $rawBilik['id'],
+            'url' => route_url('layar_bilik', ['booth' => $bNum, 'key' => $bTok]),
+        ];
+        if ($bNum === $selectedBooth) {
+            $selectedBilikId = (int) $rawBilik['id'];
+        }
+    }
+    if ($selectedBilikId === 0 && !empty($kioskLinksMap)) {
+        $firstKiosk = reset($kioskLinksMap);
+        $selectedBilikId = (int) ($firstKiosk['id'] ?? 0);
+    }
+}
+$selectedKioskUrl = $canWrite
+    ? ($kioskLinksMap[$selectedBooth]['url'] ?? route_url('layar_bilik', ['booth' => $selectedBooth]))
+    : route_url('layar_bilik', ['booth' => $selectedBooth]);
+
 $totalBilik = count($bilikList);
 $bilikIdle = 0;
 $bilikInUse = 0;
@@ -35,7 +58,7 @@ foreach ($bilikList as $b) {
 
 $extraScripts = [
     asset_url('js/vendor/qrcode.min.js') . '?v=1',
-    asset_url('js/modules/portal_qr.js') . '?v=2',
+    asset_url('js/modules/portal_qr.js') . '?v=3',
 ];
 
 require BASE_PATH . '/views/layouts/header.php';
@@ -153,6 +176,28 @@ require BASE_PATH . '/views/layouts/header.php';
                 <p class="text-muted mt-1" style="font-size:12px;">Panitia sedang menutup sesi pemindaian pada bilik ini.</p>
             </div>
         </div>
+
+        <div class="mt-3 pt-2" style="border-top:1px solid var(--border-soft);display:flex;flex-direction:column;gap:6px;">
+            <a href="<?= e($selectedKioskUrl) ?>" target="_blank" rel="noopener noreferrer" id="btnOpenBoothKiosk" class="btn btn--primary btn--sm w-full">
+                <?= $canWrite ? 'Buka Layar Laptop Bilik #0' . (int)$selectedBooth . ' ↗' : 'Pratinjau Layar Bilik #0' . (int)$selectedBooth . ' ↗' ?>
+            </a>
+            <?php if ($canWrite): ?>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:6px;">
+                <button type="button" class="btn btn--soft-primary btn--sm" id="btnCopyBoothKiosk" data-kiosk-url="<?= e($selectedKioskUrl) ?>">
+                    Salin Link Kiosk Aman
+                </button>
+                <form action="<?= e(action_url('bilik')) ?>" method="POST" style="margin:0;" data-confirm="Putar kunci akses layar kiosk bilik ini? Laptop bilik yang memakai tautan lama akan langsung terkunci.">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="sub_action" value="rotate_kiosk_key">
+                    <input type="hidden" name="id" id="rotateKioskBilikId" value="<?= (int)$selectedBilikId ?>">
+                    <button type="submit" class="btn btn--ghost btn--sm" title="Putar Kunci Akses Laptop Bilik">Putar Kunci</button>
+                </form>
+            </div>
+            <div class="text-muted" style="font-size:11px;line-height:1.45;">
+                Link Kiosk terisolasi per bilik dan berjalan tanpa login panel admin.
+            </div>
+            <?php endif; ?>
+        </div>
     </div>
 
     <!-- Kolom Kanan: Status & Kontrol Seluruh Terminal Bilik Suara -->
@@ -229,6 +274,9 @@ require BASE_PATH . '/views/layouts/header.php';
                             <?php if ($canWrite): ?>
                             <td class="text-right">
                                 <div class="data-cell-actions">
+                                    <?php $rowKioskUrl = $kioskLinksMap[(int)$b['nomor_bilik']]['url'] ?? route_url('layar_bilik', ['booth' => (int)$b['nomor_bilik']]); ?>
+                                    <a href="<?= e($rowKioskUrl) ?>" target="_blank" rel="noopener noreferrer" class="btn btn--soft-primary btn--xs" title="Buka layar kiosk khusus bilik ini">Layar ↗</a>
+                                    <button type="button" class="btn btn--ghost btn--xs btn-copy-kiosk" data-kiosk-url="<?= e($rowKioskUrl) ?>" title="Salin tautan kiosk aman tanpa login admin">Salin Link</button>
                                     <form action="<?= e(action_url('bilik')) ?>" method="POST" data-confirm="Reset token QR dan lepas kunci sesi bilik ini?">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="sub_action" value="force_reset_bilik">
@@ -265,6 +313,9 @@ require BASE_PATH . '/views/layouts/header.php';
 </div>
 
 <?php if ($canWrite): ?>
+<script>
+    window.PEMIRA_KIOSK_LINKS = <?= json_encode($kioskLinksMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+</script>
 <!-- Modal Form Tambah / Edit Bilik Suara -->
 <div class="modal-backdrop" id="bilikModal">
     <div class="modal-dialog modal-sm">

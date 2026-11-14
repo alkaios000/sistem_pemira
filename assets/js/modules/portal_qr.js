@@ -36,11 +36,57 @@ function openEditBilikModal(b) {
     PemiraApp.openModal('bilikModal');
 }
 
+function copyBoothKioskUrl(url, btnEl) {
+    if (!url) return;
+    const done = () => {
+        if (!btnEl) return;
+        const orig = btnEl.getAttribute('data-orig-label') || btnEl.textContent;
+        btnEl.setAttribute('data-orig-label', orig);
+        btnEl.textContent = 'Tersalin!';
+        setTimeout(() => { btnEl.textContent = orig; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(() => {
+            window.prompt('Salin tautan aman layar bilik ini:', url);
+        });
+    } else {
+        window.prompt('Salin tautan aman layar bilik ini:', url);
+    }
+}
+
+function syncSelectedBoothKioskControls(boothNum) {
+    const canWrite = document.getElementById('portalQrRoot')?.getAttribute('data-can-write') === '1';
+    const openBtn = document.getElementById('btnOpenBoothKiosk');
+    const copyBtn = document.getElementById('btnCopyBoothKiosk');
+    const rotateInp = document.getElementById('rotateKioskBilikId');
+    const numPad = '#0' + boothNum;
+
+    if (canWrite && window.PEMIRA_KIOSK_LINKS && window.PEMIRA_KIOSK_LINKS[boothNum]) {
+        const info = window.PEMIRA_KIOSK_LINKS[boothNum];
+        if (openBtn) {
+            openBtn.href = info.url;
+            openBtn.textContent = `Buka Layar Laptop Bilik ${numPad} ↗`;
+        }
+        if (copyBtn) {
+            copyBtn.setAttribute('data-kiosk-url', info.url);
+        }
+        if (rotateInp && info.id) {
+            rotateInp.value = String(info.id);
+        }
+    } else if (openBtn) {
+        const baseUrl = (window.PEMIRA_CONFIG && window.PEMIRA_CONFIG.baseUrl) ? window.PEMIRA_CONFIG.baseUrl : '';
+        openBtn.href = `${baseUrl}/index.php?page=layar_bilik&booth=${encodeURIComponent(boothNum)}`;
+        openBtn.textContent = `Pratinjau Layar Bilik ${numPad} ↗`;
+    }
+}
+
 function changeActiveBooth(boothNum) {
     activeBoothNumber = parseInt(boothNum, 10) || 1;
     lastRenderedToken = '';
     const sel = document.getElementById('portalBoothSelect');
     if (sel) sel.value = String(activeBoothNumber);
+
+    syncSelectedBoothKioskControls(activeBoothNumber);
 
     const url = new URL(window.location.href);
     url.searchParams.set('booth', activeBoothNumber);
@@ -168,9 +214,15 @@ function renderAllBiliksTable(allBiliks, globalPortal, wajibCheckin) {
                 nama_bilik: b.nama_bilik
             });
             const isRowClosed = b.status_bilik === 'CLOSED';
+            const kioskEntry = (window.PEMIRA_KIOSK_LINKS && window.PEMIRA_KIOSK_LINKS[b.nomor_bilik]) ? window.PEMIRA_KIOSK_LINKS[b.nomor_bilik] : null;
+            const rowKioskUrl = kioskEntry && kioskEntry.url
+                ? kioskEntry.url
+                : `${window.PEMIRA_CONFIG.baseUrl}/index.php?page=layar_bilik&booth=${encodeURIComponent(b.nomor_bilik)}`;
             adminCell = `
                 <td class="text-right">
                     <div class="data-cell-actions">
+                        <a href="${escHtml(rowKioskUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn--soft-primary btn--xs" title="Buka layar kiosk khusus bilik ini">Layar ↗</a>
+                        <button type="button" class="btn btn--ghost btn--xs btn-copy-kiosk" data-kiosk-url="${escHtml(rowKioskUrl)}" title="Salin tautan kiosk aman tanpa login admin">Salin Link</button>
                         <form action="${actionUrl}" method="POST" data-confirm="Reset token QR dan lepas kunci sesi bilik ini?">
                             <input type="hidden" name="csrf_token" value="${escHtml(csrf)}">
                             <input type="hidden" name="sub_action" value="force_reset_bilik">
@@ -303,9 +355,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!root) return;
     activeBoothNumber = parseInt(root.getAttribute('data-active-booth'), 10) || 1;
 
+    const btnCopyMain = document.getElementById('btnCopyBoothKiosk');
+    if (btnCopyMain) {
+        btnCopyMain.addEventListener('click', () => {
+            copyBoothKioskUrl(btnCopyMain.getAttribute('data-kiosk-url') || '', btnCopyMain);
+        });
+    }
+
     const tbody = document.getElementById('portalQrAllBiliksTbody');
     if (tbody) {
         tbody.addEventListener('click', e => {
+            const copyBtn = e.target.closest('.btn-copy-kiosk[data-kiosk-url]');
+            if (copyBtn) {
+                copyBoothKioskUrl(copyBtn.getAttribute('data-kiosk-url') || '', copyBtn);
+                return;
+            }
             const editBtn = e.target.closest('.btn-edit-bilik[data-bilik-edit]');
             if (editBtn) {
                 try {

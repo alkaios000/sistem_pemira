@@ -101,8 +101,8 @@ function run_initial_seeder(PDO $pdo): void
     $stmt_check_bilik = $pdo->query('SELECT COUNT(*) FROM bilik_suaras');
     if ((int) $stmt_check_bilik->fetchColumn() === 0) {
         $stmt_bilik = $pdo->prepare('
-            INSERT INTO bilik_suaras (nomor_bilik, nama_bilik, lokasi_bilik, status_bilik, current_token)
-            VALUES (:nomor_bilik, :nama_bilik, :lokasi_bilik, :status_bilik, :current_token)
+            INSERT INTO bilik_suaras (nomor_bilik, nama_bilik, lokasi_bilik, status_bilik, current_token, kiosk_token)
+            VALUES (:nomor_bilik, :nama_bilik, :lokasi_bilik, :status_bilik, :current_token, :kiosk_token)
         ');
 
         $biliks = [
@@ -118,6 +118,7 @@ function run_initial_seeder(PDO $pdo): void
                 ':lokasi_bilik'  => $b['lokasi'],
                 ':status_bilik'  => 'IDLE',
                 ':current_token' => bin2hex(random_bytes(24)),
+                ':kiosk_token'   => bin2hex(random_bytes(32)),
             ]);
         }
     }

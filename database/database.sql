@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS `bilik_suaras` (
     `status_bilik` ENUM('IDLE', 'IN_USE', 'CLOSED') NOT NULL DEFAULT 'IDLE',
     `current_token` VARCHAR(128) NOT NULL,
     `previous_token` VARCHAR(128) DEFAULT NULL,
+    `kiosk_token` VARCHAR(128) DEFAULT NULL,
     `token_generated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `active_session_token` VARCHAR(128) DEFAULT NULL,
     `active_device_id` VARCHAR(128) DEFAULT NULL,
@@ -127,7 +128,8 @@ CREATE TABLE IF NOT EXISTS `bilik_suaras` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_bilik_nomor` (`nomor_bilik`),
     KEY `idx_bilik_status` (`status_bilik`),
-    KEY `idx_bilik_tokens` (`current_token`, `previous_token`)
+    KEY `idx_bilik_tokens` (`current_token`, `previous_token`),
+    KEY `idx_bilik_kiosk_token` (`kiosk_token`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `device_sessions` (

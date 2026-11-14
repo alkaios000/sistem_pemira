@@ -150,6 +150,39 @@ function apply_log_category_migration_idempotent(PDO $pdo, string $dbname): void
     ");
 }
 
+/**
+ * Menerapkan migrasi 09 secara idempotent untuk kunci kiosk independen per bilik
+ */
+function apply_bilik_kiosk_migration_idempotent(PDO $pdo, string $dbname): void
+{
+    $stmtCol = $pdo->prepare('
+        SELECT COUNT(*)
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = :db AND TABLE_NAME = :tbl AND COLUMN_NAME = :col
+    ');
+    $stmtCol->execute([':db' => $dbname, ':tbl' => 'bilik_suaras', ':col' => 'kiosk_token']);
+    $hasCol = (int) $stmtCol->fetchColumn() > 0;
+
+    if (!$hasCol) {
+        $pdo->exec("
+            ALTER TABLE `bilik_suaras`
+                ADD COLUMN `kiosk_token` VARCHAR(128) DEFAULT NULL AFTER `previous_token`,
+                ADD KEY `idx_bilik_kiosk_token` (`kiosk_token`)
+        ");
+    }
+
+    $emptyIds = $pdo->query("SELECT id FROM bilik_suaras WHERE kiosk_token IS NULL OR kiosk_token = ''")->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($emptyIds)) {
+        $stmtUpd = $pdo->prepare('UPDATE bilik_suaras SET kiosk_token = :kiosk_token WHERE id = :id');
+        foreach ($emptyIds as $bid) {
+            $stmtUpd->execute([
+                ':kiosk_token' => bin2hex(random_bytes(32)),
+                ':id'          => (int) $bid,
+            ]);
+        }
+    }
+}
+
 try {
     $pdo_root = new PDO("mysql:host={$host};port={$port};charset=utf8mb4", $username, $password, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -171,6 +204,11 @@ try {
         }
         if (str_starts_with($base, '08_')) {
             apply_log_category_migration_idempotent($pdo_root, $dbname);
+            $executed[] = $base . ' (idempotent)';
+            continue;
+        }
+        if (str_starts_with($base, '09_')) {
+            apply_bilik_kiosk_migration_idempotent($pdo_root, $dbname);
             $executed[] = $base . ' (idempotent)';
             continue;
         }

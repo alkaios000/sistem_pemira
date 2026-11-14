@@ -5,40 +5,44 @@
  */
 require_once BASE_PATH . '/models/kandidat_model.php';
 require_once BASE_PATH . '/models/bilik_model.php';
+require_once BASE_PATH . '/models/voting_model.php';
 require_once BASE_PATH . '/models/log_model.php';
+
+header('Cache-Control: no-store, no-cache, must-revalidate, private');
+header('Pragma: no-cache');
+header('Referrer-Policy: no-referrer');
 
 $pdo = get_db_connection();
 $pageTitle = 'Bilik Pemilihan Suara';
 $isFullScreenLayout = true;
 
-$kandidatBem = get_kandidats_by_kategori($pdo, 'BEM');
-$kandidatBpm = get_kandidats_by_kategori($pdo, 'BPM');
-$bilikList = get_all_biliks($pdo);
+$urlBooth = isset($_GET['booth']) ? (int) $_GET['booth'] : 0;
+$urlToken = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
 
-$urlBooth = isset($_GET['booth']) ? (int)$_GET['booth'] : 0;
-$urlToken = isset($_GET['token']) ? trim((string)$_GET['token']) : '';
-$activeSession = $_SESSION['active_voting_session'] ?? null;
+// Pulihkan sesi aktif dari $_SESSION atau cookie persisten berproteksi HMAC bila browser sempat ditutup
+$activeSession = restore_active_voting_session($pdo);
 
-// Validasi apakah sesi PHP masih cocok dengan status IN_USE di database
-if ($activeSession && !empty($activeSession['bilik_id'])) {
-    $dbBilik = find_bilik_by_id($pdo, (int)$activeSession['bilik_id']);
-    if (
-        !$dbBilik
-        || $dbBilik['status_bilik'] !== 'IN_USE'
-        || empty($dbBilik['active_session_token'])
-        || !hash_equals((string)$dbBilik['active_session_token'], (string)($activeSession['voting_session_token'] ?? ''))
-    ) {
-        unset($_SESSION['active_voting_session']);
-        $activeSession = null;
+// Jika sudah memiliki sesi bilik aktif dan masih ada parameter token/booth di URL, bersihkan URL seketika
+if ($activeSession !== null && ($urlToken !== '' || $urlBooth > 0)) {
+    redirect(route_url('bilik_pemilihan'));
+}
+
+// Periksa apakah perangkat ini sudah menuntaskan pemilihan sebelumnya (anti double scan / double vote)
+$alreadyVotedBlocked = false;
+if ($activeSession === null) {
+    $votedDeviceCookie = get_verified_voted_device_cookie();
+    if ($votedDeviceCookie !== null && has_device_already_voted_record($pdo, $votedDeviceCookie)) {
+        $alreadyVotedBlocked = true;
     }
 }
 
 // Deteksi percobaan akses paksa step=2 atau step=3 lewat URL tanpa sesi QR aktif (DIRECT_URL_BYPASS)
-if (isset($_GET['step']) && in_array((int)$_GET['step'], [2, 3], true) && !$activeSession) {
+if (isset($_GET['step']) && in_array((int) $_GET['step'], [2, 3], true) && !$activeSession) {
     record_audit_log($pdo, [
         'bilik_id'           => $urlBooth > 0 ? $urlBooth : null,
+        'log_category'       => 'pemilih',
         'nim'                => null,
-        'device_id'          => $_COOKIE['pemira_voted_device'] ?? 'direct_url_client',
+        'device_id'          => $_COOKIE['pemira_voted_device'] ?? ($_COOKIE['pemira_device_id'] ?? 'direct_url_client'),
         'fingerprint_hash'   => null,
         'browser_session_id' => $_SESSION['voter_browser_session_id'] ?? session_id(),
         'ip_address'         => get_client_ip(),
@@ -46,14 +50,28 @@ if (isset($_GET['step']) && in_array((int)$_GET['step'], [2, 3], true) && !$acti
         'status_log'         => 'FRAUD',
         'kode_event'         => 'DIRECT_URL_BYPASS',
         'judul_event'        => 'Percobaan Bypass URL Langsung ke Form Pemilihan',
-        'keterangan'         => 'Perangkat mencoba melompat langsung ke parameter step=' . (int)$_GET['step'] . ' tanpa klaim QR bilik yang sah.',
+        'keterangan'         => 'Perangkat mencoba melompat langsung ke parameter step=' . (int) $_GET['step'] . ' tanpa klaim QR bilik yang sah.',
     ]);
     set_flash('danger', 'Peringatan Keamanan: Akses langsung tanpa memindai QR Code bilik ditolak dan telah dicatat ke Log Keamanan.');
 }
 
+$initialStep = 1;
+if ($alreadyVotedBlocked) {
+    $initialStep = 0;
+} elseif ($activeSession !== null && !empty($activeSession['verified_nim'])) {
+    $initialStep = 3;
+} elseif ($activeSession !== null) {
+    $initialStep = 2;
+}
+
+$hasUrlScan = ($initialStep === 1 && $urlToken !== '');
+
+$kandidatBem = get_kandidats_by_kategori($pdo, 'BEM');
+$kandidatBpm = get_kandidats_by_kategori($pdo, 'BPM');
+
 $extraScripts = [
     asset_url('js/vendor/html5-qrcode.min.js') . '?v=1',
-    asset_url('js/modules/voting_client.js')
+    asset_url('js/modules/voting_client.js') . '?v=3',
 ];
 
 require BASE_PATH . '/views/layouts/header.php';
@@ -61,10 +79,10 @@ require BASE_PATH . '/views/layouts/header.php';
 
 <div class="voting-shell"
      id="votingRoot"
-     data-url-booth="<?= (int)$urlBooth ?>"
-     data-url-token="<?= e($urlToken) ?>"
-     data-session-bilik-id="<?= (int)($activeSession['bilik_id'] ?? 0) ?>"
-     data-session-nomor-bilik="<?= (int)($activeSession['nomor_bilik'] ?? 0) ?>"
+     data-initial-step="<?= (int) $initialStep ?>"
+     data-has-url-scan="<?= $hasUrlScan ? '1' : '0' ?>"
+     data-session-bilik-id="<?= (int) ($activeSession['bilik_id'] ?? 0) ?>"
+     data-session-nomor-bilik="<?= (int) ($activeSession['nomor_bilik'] ?? 0) ?>"
      data-session-nama-bilik="<?= e($activeSession['nama_bilik'] ?? '') ?>"
      data-session-token="<?= e($activeSession['voting_session_token'] ?? '') ?>"
      data-session-device-id="<?= e($activeSession['device_id'] ?? '') ?>"
@@ -79,95 +97,101 @@ require BASE_PATH . '/views/layouts/header.php';
             <img src="<?= e(asset_url('img/ubw_logo.png')) ?>" alt="Logo UBW" class="brand-img-sm">
             <span class="fw-700" style="font-size:13.5px;">Sistem PEMIRA · Bilik Pemilihan Suara</span>
         </div>
-
-        <div class="d-flex align-center gap-2">
-            <?php if (is_authenticated()): ?>
-                <a href="<?= e(route_url('portal_qr')) ?>" class="btn btn--soft-primary btn--xs">Layar Portal QR</a>
-                <a href="<?= e(route_url('dashboard')) ?>" class="btn btn--ghost btn--xs">Panel Admin</a>
-            <?php else: ?>
-                <a href="<?= e(route_url('live_count_bem')) ?>" class="btn btn--ghost btn--xs">Live Count</a>
-                <a href="<?= e(route_url('login')) ?>" class="btn btn--ghost btn--xs">Login Panitia</a>
-            <?php endif; ?>
-        </div>
     </header>
 
     <main class="voting-container">
+        <?php if ($alreadyVotedBlocked): ?>
+            <div id="panelAlreadyVoted" class="card scanner-card text-center">
+                <div class="mb-2">
+                    <span class="badge danger dot">PERANGKAT SUDAH MEMILIH</span>
+                </div>
+                <h2 class="hero-title" style="font-size:19px;">Hak Pilih Pada Perangkat Ini Sudah Digunakan</h2>
+                <p class="text-muted mt-2 mb-3" style="font-size:12.5px;line-height:1.55;">
+                    Sistem mendeteksi perangkat dan browser ini telah menyelesaikan pemilihan pada sesi PEMIRA saat ini. Satu perangkat hanya dapat digunakan 1 kali untuk menjaga keadilan suara.
+                </p>
+                <a href="<?= e(route_url('live_count_bem')) ?>" class="btn btn--primary btn--sm w-full">Lihat Live Count Hasil Sementara</a>
+            </div>
+        <?php endif; ?>
+
         <!-- Stepper -->
-        <div class="voting-steps" style="flex-wrap:wrap;">
-            <div class="step-pill is-active" id="stepPill1">
+        <div class="voting-steps" id="votingStepper" style="<?= $alreadyVotedBlocked ? 'display:none;' : '' ?>flex-wrap:wrap;">
+            <div class="step-pill <?= $initialStep === 1 ? 'is-active' : ($initialStep > 1 ? 'is-done' : '') ?>" id="stepPill1">
                 <span class="num">1</span>
                 <span>Scan QR Bilik</span>
             </div>
             <span class="text-light">/</span>
-            <div class="step-pill" id="stepPill2">
+            <div class="step-pill <?= $initialStep === 2 ? 'is-active' : ($initialStep > 2 ? 'is-done' : '') ?>" id="stepPill2">
                 <span class="num">2</span>
                 <span>Verifikasi NIM</span>
             </div>
             <span class="text-light">/</span>
-            <div class="step-pill" id="stepPill3">
+            <div class="step-pill <?= $initialStep === 3 ? 'is-active' : ($initialStep > 3 ? 'is-done' : '') ?>" id="stepPill3">
                 <span class="num">3</span>
                 <span>Surat Suara BEM & BPM</span>
             </div>
         </div>
 
-        <!-- PANEL 1: SCAN KAMERA QR / KLAIM TOKEN QR BILIK -->
-        <div id="panelStep1" class="card scanner-card">
+        <!-- PANEL 1: SCAN KAMERA QR OTOMATIS (TANPA PILIH BILIK & TANPA TAMPILKAN TOKEN) -->
+        <div id="panelStep1" class="card scanner-card" style="<?= $initialStep === 1 ? 'display:flex;' : 'display:none;' ?>">
             <div class="card-head">
                 <div class="card-title-wrap">
                     <h3 class="card-title">Pindai QR Code Bilik Suara</h3>
                 </div>
-                <span class="badge primary dot">One-Time QR</span>
+                <span class="badge primary dot">Deteksi Otomatis</span>
             </div>
 
-            <div id="qrCameraReader" class="scanner-viewport" style="display:none;"></div>
+            <div id="qrScanIdleView" style="<?= $hasUrlScan ? 'display:none;' : 'display:block;' ?>">
+                <p class="text-muted mb-2" style="font-size:12.5px;line-height:1.5;">
+                    Arahkan kamera ponsel ke QR Code pada layar bilik suara. Sistem akan otomatis mendeteksi bilik dan membawa Anda ke tahap verifikasi NIM.
+                </p>
 
-            <div class="d-flex gap-2 mb-3">
-                <button type="button" class="btn btn--soft-primary btn--sm w-full" id="btnStartQrCamera" onclick="startQrCamera()">Buka Kamera Pemindai QR</button>
-                <button type="button" class="btn btn--ghost btn--sm" id="btnStopQrCamera" onclick="stopQrCamera()" style="display:none;">Tutup Kamera</button>
+                <div id="qrCameraReader" class="scanner-viewport" style="display:flex;">
+                    <span>Meminta izin akses kamera...</span>
+                </div>
+
+                <div id="qrCameraPermissionMsg" class="text-muted text-center mt-2 mb-2" style="display:none;font-size:12px;line-height:1.45;"></div>
+
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="btn btn--primary btn--sm w-full" id="btnStartQrCamera" onclick="startQrCamera(true)" style="display:none;">Izinkan &amp; Buka Kamera Pemindai QR</button>
+                    <button type="button" class="btn btn--ghost btn--sm w-full" id="btnStopQrCamera" onclick="stopQrCamera()" style="display:none;">Tutup Kamera</button>
+                </div>
             </div>
 
-            <div style="border-top:1px dashed var(--border);padding-top:12px;">
-                <div class="field">
-                    <label class="field-label">Pilih Bilik Suara</label>
-                    <select id="claimBoothSelect" class="select">
-                        <?php foreach ($bilikList as $b): ?>
-                            <option value="<?= (int)$b['nomor_bilik'] ?>" <?= ($urlBooth === (int)$b['nomor_bilik']) ? 'selected' : '' ?>>
-                                Bilik #0<?= (int)$b['nomor_bilik'] ?> · <?= e($b['nama_bilik']) ?> (<?= e($b['status_bilik']) ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+            <div id="qrAutoProcessing" class="voting-auto-status" style="<?= $hasUrlScan ? 'display:flex;' : 'display:none;' ?>">
+                <div class="voting-spinner" aria-hidden="true"></div>
+                <div class="fw-700" style="font-size:14px;">QR Code Terdeteksi</div>
+                <div class="text-muted" id="qrAutoProcessingText" style="font-size:12px;">Mendeteksi bilik suara dan mengaktifkan sesi Anda...</div>
+            </div>
 
-                <div class="field">
-                    <label class="field-label">Token QR Bilik</label>
-                    <input type="text" id="claimTokenInput" class="input mono" value="<?= e($urlToken) ?>" placeholder="Otomatis terisi saat scan QR...">
+            <div id="qrScanErrorBox" class="alert danger" style="display:none;margin-top:12px;margin-bottom:0;">
+                <div class="alert-body" style="width:100%;">
+                    <div id="qrScanErrorMsg">-</div>
+                    <button type="button" class="btn btn--soft-primary btn--xs mt-2" id="btnRetryQrScan" onclick="retryQrScan()">Pindai Ulang QR Bilik</button>
                 </div>
-
-                <button type="button" class="btn btn--primary btn-block mt-2" id="btnClaimQr" onclick="submitClaimQr()">Kunci Bilik & Lanjutkan →</button>
             </div>
         </div>
 
         <!-- PANEL 2: VERIFIKASI NIM MAHASISWA -->
-        <div id="panelStep2" class="card scanner-card" style="display:none;">
+        <div id="panelStep2" class="card scanner-card" style="<?= $initialStep === 2 ? 'display:flex;' : 'display:none;' ?>">
             <div class="card-head">
                 <div class="card-title-wrap">
                     <h3 class="card-title">Masukkan NIM Anda</h3>
                 </div>
-                <span class="badge success dot" id="lockedBoothLabel">Bilik Terkunci</span>
+                <span class="badge success dot" id="lockedBoothLabel"><?= e($activeSession['nama_bilik'] ?? 'Bilik Terkunci') ?></span>
             </div>
 
             <p class="text-muted mb-3">Masukkan Nomor Induk Mahasiswa (NIM) yang terdaftar di DPT. Maksimal 3 kali percobaan salah.</p>
 
             <div class="field">
                 <label class="field-label">Nomor Induk Mahasiswa (NIM)</label>
-                <input type="text" id="verifyNimInput" class="input mono" placeholder="Contoh: 240101003" autocomplete="off">
+                <input type="text" id="verifyNimInput" class="input mono" placeholder="Contoh: 240101003" autocomplete="off" inputmode="numeric">
             </div>
 
             <button type="button" class="btn btn--primary btn-block mt-2" id="btnVerifyNim" onclick="submitVerifyNim()">Verifikasi NIM & Buka Surat Suara →</button>
         </div>
 
         <!-- PANEL 3: SURAT SUARA BEM & BPM -->
-        <div id="panelStep3" style="display:none;">
+        <div id="panelStep3" style="<?= $initialStep === 3 ? 'display:block;' : 'display:none;' ?>">
             <div class="card mb-3" style="padding:12px 16px;background:var(--primary-soft);border-color:rgba(37,99,235,0.2);">
                 <div class="d-flex justify-between align-center flex-wrap gap-2">
                     <div>
@@ -263,9 +287,8 @@ require BASE_PATH . '/views/layouts/header.php';
             </div>
             <h2 class="hero-title" style="font-size:20px;">Suara Berhasil Masuk</h2>
             <p class="text-muted mt-2 mb-3">Terima kasih! Hak pilih Anda untuk Presiden BEM dan Ketua Umum BPM telah direkam secara rahasia dan sesi bilik telah ditutup kembali.</p>
-            <div class="d-flex justify-between gap-2">
-                <a href="<?= e(route_url('live_count_bem')) ?>" class="btn btn--primary btn--sm w-full">Lihat Live Count</a>
-                <a href="<?= e(route_url('bilik_pemilihan')) ?>" class="btn btn--ghost btn--sm w-full">Kembali ke Layar Awal</a>
+            <div class="d-flex justify-center">
+                <a href="<?= e(route_url('live_count_bem')) ?>" class="btn btn--primary btn--sm w-full">Lihat Live Count Hasil Sementara</a>
             </div>
         </div>
     </main>

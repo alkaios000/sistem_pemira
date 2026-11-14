@@ -11,6 +11,280 @@ require_once BASE_PATH . '/models/mahasiswa_model.php';
 require_once BASE_PATH . '/models/user_model.php';
 
 /**
+ * Mengatur cookie sesi pemilihan berproteksi HttpOnly & SameSite=Lax
+ */
+function set_voting_cookie(string $name, string $value, int $ttl_seconds): void
+{
+    $is_secure = function_exists('is_https_request') ? is_https_request() : false;
+    $expires = $ttl_seconds > 0 ? (time() + $ttl_seconds) : (time() - 3600);
+
+    if (PHP_SAPI !== 'cli' && !headers_sent()) {
+        setcookie($name, $value, [
+            'expires'  => $expires,
+            'path'     => '/',
+            'secure'   => $is_secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
+
+    if ($ttl_seconds <= 0) {
+        unset($_COOKIE[$name]);
+    } else {
+        $_COOKIE[$name] = $value;
+    }
+}
+
+/**
+ * Menerbitkan cookie identitas perangkat bertanda tangan HMAC persisten (30 hari)
+ */
+function issue_device_identity_cookies(string $device_id, int $ttl_days = 30): void
+{
+    $ttl = max(300, $ttl_days * 86400);
+    set_voting_cookie('pemira_device_id', $device_id, $ttl);
+    set_voting_cookie('pemira_device_sig', sign_hmac_value('dev|' . $device_id), $ttl);
+}
+
+/**
+ * Mengambil device_id terverifikasi HMAC dari cookie voted atau cookie perangkat persisten
+ */
+function get_verified_device_cookie(): ?string
+{
+    if (!empty($_COOKIE['pemira_voted_device'])) {
+        $voted_dev = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $_COOKIE['pemira_voted_device']);
+        $voted_sig = isset($_COOKIE['pemira_voted_sig']) ? (string) $_COOKIE['pemira_voted_sig'] : null;
+        if ($voted_dev !== '' && verify_hmac_value($voted_dev, $voted_sig)) {
+            return $voted_dev;
+        }
+    }
+
+    if (!empty($_COOKIE['pemira_device_id'])) {
+        $dev = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $_COOKIE['pemira_device_id']);
+        $sig = isset($_COOKIE['pemira_device_sig']) ? (string) $_COOKIE['pemira_device_sig'] : null;
+        if ($dev !== '' && verify_hmac_value('dev|' . $dev, $sig)) {
+            return $dev;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Mengambil device_id dari cookie penanda sudah memilih jika signature HMAC valid
+ */
+function get_verified_voted_device_cookie(): ?string
+{
+    if (empty($_COOKIE['pemira_voted_device'])) {
+        return null;
+    }
+    $voted_dev = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $_COOKIE['pemira_voted_device']);
+    $voted_sig = isset($_COOKIE['pemira_voted_sig']) ? (string) $_COOKIE['pemira_voted_sig'] : null;
+    if ($voted_dev !== '' && verify_hmac_value($voted_dev, $voted_sig)) {
+        return $voted_dev;
+    }
+    return null;
+}
+
+/**
+ * Menerbitkan cookie pemulihan sesi pemilihan aktif agar tahan saat browser ditutup & dibuka lagi
+ */
+function issue_active_voting_resume_cookie(
+    int $bilik_id,
+    string $voting_session_token,
+    string $device_id,
+    int $ttl_seconds
+): void {
+    $hmac = sign_hmac_value("active|{$bilik_id}|{$voting_session_token}|{$device_id}");
+    $cookie_ttl = max(900, $ttl_seconds + 300);
+    set_voting_cookie('pemira_active_vote', "{$bilik_id}:{$hmac}", $cookie_ttl);
+}
+
+/**
+ * Menghapus cookie pemulihan sesi aktif ketika suara sudah dikirim atau sesi gugur
+ */
+function clear_active_voting_resume_cookie(): void
+{
+    set_voting_cookie('pemira_active_vote', '', 0);
+}
+
+/**
+ * Memeriksa di DB apakah device_id tertentu sudah tercatat menyelesaikan voting
+ */
+function has_device_already_voted_record(PDO $pdo, string $device_id): bool
+{
+    if ($device_id === '') {
+        return false;
+    }
+    $stmt = $pdo->prepare('
+        SELECT id FROM device_sessions
+        WHERE device_id = :device_id AND sudah_digunakan_vote = 1
+        LIMIT 1
+    ');
+    $stmt->execute([':device_id' => $device_id]);
+    return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * Mendeteksi bilik suara secara otomatis berdasarkan token QR (current_token atau previous_token)
+ */
+function find_bilik_by_qr_token(PDO $pdo, string $qr_token): ?array
+{
+    release_expired_bilik_locks($pdo);
+    $qr_token = trim($qr_token);
+    if ($qr_token === '') {
+        return null;
+    }
+
+    $stmt = $pdo->prepare('
+        SELECT * FROM bilik_suaras
+        WHERE current_token = :cur_token OR previous_token = :prev_token
+        LIMIT 1
+    ');
+    $stmt->execute([
+        ':cur_token'  => $qr_token,
+        ':prev_token' => $qr_token,
+    ]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+/**
+ * Mencari bilik suara yang sedang IN_USE secara sah untuk suatu device_id
+ */
+function find_active_bilik_by_device(PDO $pdo, string $device_id): ?array
+{
+    release_expired_bilik_locks($pdo);
+    if ($device_id === '') {
+        return null;
+    }
+
+    $stmt = $pdo->prepare('
+        SELECT * FROM bilik_suaras
+        WHERE status_bilik = "IN_USE"
+          AND active_device_id = :device_id
+          AND active_session_token IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 1
+    ');
+    $stmt->execute([':device_id' => $device_id]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+/**
+ * Memulihkan atau memvalidasi sesi pemilihan aktif (baik dari $_SESSION maupun cookie persisten
+ * setelah pemilih menutup lalu membuka kembali browser) secara kriptografis.
+ */
+function restore_active_voting_session(PDO $pdo, bool $sync_browser_session = true): ?array
+{
+    $global_status = get_setting_value($pdo, 'status_portal_global', 'BUKA');
+    if ($global_status !== 'BUKA') {
+        unset($_SESSION['active_voting_session']);
+        return null;
+    }
+
+    $sess = $_SESSION['active_voting_session'] ?? null;
+    if (is_array($sess) && !empty($sess['bilik_id']) && !empty($sess['voting_session_token'])) {
+        $dbBilik = find_bilik_by_id($pdo, (int) $sess['bilik_id']);
+        if (
+            $dbBilik
+            && $dbBilik['status_bilik'] === 'IN_USE'
+            && !empty($dbBilik['active_session_token'])
+            && hash_equals((string) $dbBilik['active_session_token'], (string) $sess['voting_session_token'])
+        ) {
+            if (!empty($dbBilik['active_nim']) && empty($sess['verified_nim'])) {
+                $mhs = find_mahasiswa_by_nim($pdo, (string) $dbBilik['active_nim']);
+                if ($mhs && (int) $mhs['sudah_memilih'] === 0) {
+                    $sess['verified_nim'] = $mhs['nim'];
+                    $sess['verified_nama'] = $mhs['nama_lengkap'];
+                    $sess['verified_kelas'] = $mhs['nama_kelas'];
+                    $sess['verified_jurusan'] = $mhs['jurusan'];
+                    $_SESSION['active_voting_session'] = $sess;
+                }
+            }
+            return $sess;
+        }
+        unset($_SESSION['active_voting_session']);
+    }
+
+    $raw_active_cookie = trim((string) ($_COOKIE['pemira_active_vote'] ?? ''));
+    if ($raw_active_cookie === '' || !str_contains($raw_active_cookie, ':')) {
+        return null;
+    }
+
+    [$bilik_id_str, $cookie_hmac] = explode(':', $raw_active_cookie, 2);
+    $bilik_id = (int) $bilik_id_str;
+    $cookie_device = get_verified_device_cookie();
+
+    if ($bilik_id < 1 || $cookie_hmac === '' || $cookie_device === null) {
+        clear_active_voting_resume_cookie();
+        return null;
+    }
+
+    if (has_device_already_voted_record($pdo, $cookie_device)) {
+        clear_active_voting_resume_cookie();
+        return null;
+    }
+
+    $dbBilik = find_bilik_by_id($pdo, $bilik_id);
+    if (
+        !$dbBilik
+        || $dbBilik['status_bilik'] !== 'IN_USE'
+        || empty($dbBilik['active_session_token'])
+        || empty($dbBilik['active_device_id'])
+        || !hash_equals((string) $dbBilik['active_device_id'], $cookie_device)
+        || !verify_hmac_value("active|{$bilik_id}|{$dbBilik['active_session_token']}|{$dbBilik['active_device_id']}", $cookie_hmac)
+    ) {
+        clear_active_voting_resume_cookie();
+        return null;
+    }
+
+    $restored = [
+        'bilik_id'             => (int) $dbBilik['id'],
+        'nomor_bilik'          => (int) $dbBilik['nomor_bilik'],
+        'nama_bilik'           => $dbBilik['nama_bilik'],
+        'voting_session_token' => (string) $dbBilik['active_session_token'],
+        'device_id'            => (string) $dbBilik['active_device_id'],
+        'verified_nim'         => null,
+        'verified_nama'        => null,
+        'verified_kelas'       => null,
+        'verified_jurusan'     => null,
+    ];
+
+    if (!empty($dbBilik['active_nim'])) {
+        $mhs = find_mahasiswa_by_nim($pdo, (string) $dbBilik['active_nim']);
+        if ($mhs && (int) $mhs['sudah_memilih'] === 0) {
+            $restored['verified_nim'] = $mhs['nim'];
+            $restored['verified_nama'] = $mhs['nama_lengkap'];
+            $restored['verified_kelas'] = $mhs['nama_kelas'];
+            $restored['verified_jurusan'] = $mhs['jurusan'];
+        }
+    }
+
+    $_SESSION['active_voting_session'] = $restored;
+
+    if ($sync_browser_session && session_status() === PHP_SESSION_ACTIVE) {
+        if (empty($_SESSION['voter_browser_session_id'])) {
+            $_SESSION['voter_browser_session_id'] = 'bsess_' . bin2hex(random_bytes(16));
+        }
+        $stmt_sync_bs = $pdo->prepare('
+            UPDATE device_sessions
+            SET browser_session_id = :bs
+            WHERE device_id = :device_id AND bilik_id = :bilik_id AND sudah_digunakan_vote = 0
+            ORDER BY id DESC
+            LIMIT 1
+        ');
+        $stmt_sync_bs->execute([
+            ':bs'        => $_SESSION['voter_browser_session_id'],
+            ':device_id' => $cookie_device,
+            ':bilik_id'  => $bilik_id,
+        ]);
+    }
+
+    return $restored;
+}
+
+/**
  * Memeriksa apakah perangkat (berdasarkan device_id, session, atau fingerprint) sudah pernah memilih
  */
 function check_device_already_voted(
@@ -57,22 +331,23 @@ function claim_qr_token_for_device(
     string $browser_session_id,
     string $ip,
     string $ua,
-    int $session_ttl_seconds = 180
+    int $session_ttl_seconds = 180,
+    bool $can_resume_owned_booth = false
 ): array {
     release_expired_bilik_locks($pdo);
 
-    $bilik = find_bilik_by_nomor($pdo, $nomor_bilik);
-    if (!$bilik) {
-        return [
-            'status'     => false,
-            'kode_error' => 'INVALID_BOOTH',
-            'message'    => 'Bilik suara tidak ditemukan di dalam sistem.',
-        ];
+    // 0. Deteksi bilik otomatis dari token bila nomor_bilik tidak dikirim
+    $bilik = null;
+    if ($nomor_bilik > 0) {
+        $bilik = find_bilik_by_nomor($pdo, $nomor_bilik);
+    } elseif ($qr_token !== '') {
+        $bilik = find_bilik_by_qr_token($pdo, $qr_token);
+        if (!$bilik && $can_resume_owned_booth) {
+            $bilik = find_active_bilik_by_device($pdo, $device_id);
+        }
     }
 
-    $bilik_id = (int) $bilik['id'];
-
-    // 1. Cek apakah perangkat ini sudah pernah melakukan voting sebelumnya
+    // 1. Cek apakah perangkat ini sudah pernah melakukan voting sebelumnya (meskipun bilik belum terdeteksi)
     $used_device = check_device_already_voted($pdo, $device_id, $fingerprint_hash, $browser_session_id);
     if ($used_device !== null) {
         $nim_lama = $used_device['nim_terkait'] ?? null;
@@ -80,7 +355,7 @@ function claim_qr_token_for_device(
         $info_pemilik = $nim_lama ? " (sebelumnya digunakan oleh NIM {$nim_lama} - {$nama_lama})" : '';
 
         record_audit_log($pdo, [
-            'bilik_id'             => $bilik_id,
+            'bilik_id'             => $bilik ? (int) $bilik['id'] : null,
             'nim'                  => $nim_lama,
             'nama_mahasiswa_cache' => $nama_lama,
             'device_id'            => $device_id,
@@ -91,7 +366,7 @@ function claim_qr_token_for_device(
             'status_log'           => 'FRAUD',
             'kode_event'           => 'DOUBLE_SCAN_SAME_DEVICE',
             'judul_event'          => 'Percobaan Scan Ke-2 oleh Device yang Sama',
-            'keterangan'           => "Perangkat dengan Device ID {$device_id}{$info_pemilik} mencoba memindai ulang QR Code di {$bilik['nama_bilik']}. Akses ditolak otomatis.",
+            'keterangan'           => "Perangkat dengan Device ID {$device_id}{$info_pemilik} mencoba memindai ulang QR Code" . ($bilik ? " di {$bilik['nama_bilik']}" : '') . ". Akses ditolak otomatis.",
         ]);
 
         return [
@@ -100,6 +375,35 @@ function claim_qr_token_for_device(
             'message'    => 'Perangkat dan browser ini tercatat sudah digunakan untuk memilih. Satu perangkat hanya diizinkan melakukan 1 kali pemilihan.',
         ];
     }
+
+    if (!$bilik) {
+        if ($nomor_bilik <= 0 && $qr_token !== '') {
+            record_audit_log($pdo, [
+                'bilik_id'           => null,
+                'device_id'          => $device_id,
+                'fingerprint_hash'   => $fingerprint_hash,
+                'browser_session_id' => $browser_session_id,
+                'ip_address'         => $ip,
+                'user_agent'         => $ua,
+                'status_log'         => 'FRAUD',
+                'kode_event'         => 'EXPIRED_OR_USED_TOKEN_SCAN',
+                'judul_event'        => 'Pemindaian Token QR Tidak Dikenal / Kadaluarsa',
+                'keterangan'         => "Perangkat {$device_id} memindai token QR yang sudah berotasi/tidak dikenal tanpa nomor bilik.",
+            ]);
+            return [
+                'status'     => false,
+                'kode_error' => 'TOKEN_EXPIRED',
+                'message'    => 'Token QR Code sudah kadaluarsa atau tidak valid. Silakan pindai ulang langsung dari layar bilik suara.',
+            ];
+        }
+        return [
+            'status'     => false,
+            'kode_error' => 'INVALID_BOOTH',
+            'message'    => 'Bilik suara tidak ditemukan di dalam sistem.',
+        ];
+    }
+
+    $bilik_id = (int) $bilik['id'];
 
     // 2. Cek apakah portal global sedang ditutup oleh Admin
     $global_status = get_setting_value($pdo, 'status_portal_global', 'BUKA');
@@ -111,9 +415,23 @@ function claim_qr_token_for_device(
         ];
     }
 
-    // 3. Jika device yang SAMA me-refresh halaman saat bilik sedang IN_USE oleh dirinya sendiri
+    // 2B. Cegah 1 perangkat mengunci bilik ke-2 saat masih memiliki sesi aktif di bilik lain
+    if ($can_resume_owned_booth) {
+        $owned_active = find_active_bilik_by_device($pdo, $device_id);
+        if ($owned_active && (int) $owned_active['id'] !== $bilik_id) {
+            return [
+                'status'             => false,
+                'kode_error'         => 'DEVICE_HAS_ACTIVE_SESSION',
+                'active_nomor_bilik' => (int) $owned_active['nomor_bilik'],
+                'message'            => "Perangkat Anda masih memiliki sesi pemilihan aktif di {$owned_active['nama_bilik']}. Silakan lanjutkan sesi tersebut.",
+            ];
+        }
+    }
+
+    // 3. Jika perangkat sah yang SAMA kembali membuka halaman / scan saat bilik sedang IN_USE oleh dirinya sendiri
     if (
-        $bilik['status_bilik'] === 'IN_USE'
+        $can_resume_owned_booth
+        && $bilik['status_bilik'] === 'IN_USE'
         && !empty($bilik['active_device_id'])
         && hash_equals((string) $bilik['active_device_id'], $device_id)
         && !empty($bilik['active_session_token'])
@@ -131,6 +449,19 @@ function claim_qr_token_for_device(
         ]);
         $dev_row = $stmt_latest_dev->fetch();
 
+        $active_mhs = null;
+        if (!empty($bilik['active_nim'])) {
+            $mhs = find_mahasiswa_by_nim($pdo, (string) $bilik['active_nim']);
+            if ($mhs && (int) $mhs['sudah_memilih'] === 0) {
+                $active_mhs = [
+                    'nim'          => $mhs['nim'],
+                    'nama_lengkap' => $mhs['nama_lengkap'],
+                    'nama_kelas'   => $mhs['nama_kelas'],
+                    'jurusan'      => $mhs['jurusan'],
+                ];
+            }
+        }
+
         return [
             'status'               => true,
             'bilik_id'             => $bilik_id,
@@ -138,7 +469,8 @@ function claim_qr_token_for_device(
             'nama_bilik'           => $bilik['nama_bilik'],
             'voting_session_token' => $bilik['active_session_token'],
             'device_session_id'    => $dev_row ? (int) $dev_row['id'] : null,
-            'active_nim'           => $bilik['active_nim'],
+            'active_nim'           => $active_mhs ? $active_mhs['nim'] : null,
+            'active_mahasiswa'     => $active_mhs,
             'message'              => 'Melanjutkan sesi bilik suara aktif.',
         ];
     }

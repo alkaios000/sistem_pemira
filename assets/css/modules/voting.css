@@ -107,6 +107,34 @@
     font-size: 12px;
 }
 
+.voting-auto-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 10px;
+    padding: 28px 18px;
+    border-radius: 10px;
+    border: 1px dashed var(--border);
+    background: var(--bg-muted);
+}
+
+.voting-spinner {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 3px solid var(--primary-soft);
+    border-top-color: var(--primary);
+    animation: votingSpin 0.8s linear infinite;
+}
+
+@keyframes votingSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* Surat Suara Grid */
 .ballot-grid {
     display: grid;

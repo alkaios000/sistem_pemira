@@ -13,7 +13,10 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php if (empty($skipCsrfMeta)): ?>
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
+    <?php endif; ?>
+    <meta name="referrer" content="no-referrer">
     <title><?= e($pageTitle) ?> · <?= e($appName) ?></title>
 
     <!-- App Icons & Favicon (Circular Transparent PNG) -->
@@ -36,14 +39,14 @@ $appName = env_val('APP_NAME', 'Sistem E-Voting PEMIRA');
     <link rel="stylesheet" href="<?= e(asset_url('css/components/modals.css')) ?>?v=15">
     <link rel="stylesheet" href="<?= e(asset_url('css/components/badges.css')) ?>?v=11">
     <link rel="stylesheet" href="<?= e(asset_url('css/modules/dashboard.css')) ?>?v=13">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/portal_qr.css')) ?>?v=11">
-    <link rel="stylesheet" href="<?= e(asset_url('css/modules/voting.css')) ?>?v=11">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/portal_qr.css')) ?>?v=12">
+    <link rel="stylesheet" href="<?= e(asset_url('css/modules/voting.css')) ?>?v=12">
     <link rel="stylesheet" href="<?= e(asset_url('css/modules/live_count.css')) ?>?v=12">
 
     <script>
         window.PEMIRA_CONFIG = {
             baseUrl: "<?= e(base_url()) ?>",
-            csrfToken: "<?= e(csrf_token()) ?>"
+            csrfToken: "<?= !empty($skipCsrfMeta) ? '' : e(csrf_token()) ?>"
         };
     </script>
 </head>

@@ -22,6 +22,7 @@ function get_all_biliks(PDO $pdo): array
             b.status_bilik,
             b.current_token,
             b.previous_token,
+            b.kiosk_token,
             b.token_generated_at,
             b.active_session_token,
             b.active_device_id,
@@ -35,7 +36,7 @@ function get_all_biliks(PDO $pdo): array
         LEFT JOIN audit_logs l ON l.bilik_id = b.id
         GROUP BY
             b.id, b.nomor_bilik, b.nama_bilik, b.lokasi_bilik, b.status_bilik,
-            b.current_token, b.previous_token, b.token_generated_at,
+            b.current_token, b.previous_token, b.kiosk_token, b.token_generated_at,
             b.active_session_token, b.active_device_id, b.active_nim,
             b.locked_until, b.last_vote_at, b.total_suara_bilik, b.created_at
         ORDER BY b.nomor_bilik ASC
@@ -146,16 +147,65 @@ function find_bilik_by_nomor(PDO $pdo, int $nomor_bilik): ?array
 function create_bilik(PDO $pdo, int $nomor_bilik, string $nama_bilik, string $lokasi_bilik): int
 {
     $stmt = $pdo->prepare('
-        INSERT INTO bilik_suaras (nomor_bilik, nama_bilik, lokasi_bilik, status_bilik, current_token, token_generated_at)
-        VALUES (:nomor_bilik, :nama_bilik, :lokasi_bilik, "IDLE", :current_token, NOW())
+        INSERT INTO bilik_suaras (nomor_bilik, nama_bilik, lokasi_bilik, status_bilik, current_token, kiosk_token, token_generated_at)
+        VALUES (:nomor_bilik, :nama_bilik, :lokasi_bilik, "IDLE", :current_token, :kiosk_token, NOW())
     ');
     $stmt->execute([
         ':nomor_bilik'   => $nomor_bilik,
         ':nama_bilik'    => $nama_bilik,
         ':lokasi_bilik'  => $lokasi_bilik !== '' ? $lokasi_bilik : null,
         ':current_token' => generate_secure_token(20),
+        ':kiosk_token'   => generate_secure_token(24),
     ]);
     return (int) $pdo->lastInsertId();
+}
+
+/**
+ * Memastikan bilik memiliki kiosk_token kriptografis (backfill aman bila kosong)
+ */
+function ensure_bilik_kiosk_token(PDO $pdo, array $bilik): string
+{
+    $existing = trim((string) ($bilik['kiosk_token'] ?? ''));
+    if ($existing !== '') {
+        return $existing;
+    }
+
+    $token = generate_secure_token(24);
+    $stmt = $pdo->prepare('UPDATE bilik_suaras SET kiosk_token = :token WHERE id = :id');
+    $stmt->execute([
+        ':token' => $token,
+        ':id'    => (int) $bilik['id'],
+    ]);
+    return $token;
+}
+
+/**
+ * Memutar/mencabut kunci kiosk bilik sehingga tautan/sesi layar bilik lama otomatis gugur
+ */
+function rotate_bilik_kiosk_token(PDO $pdo, int $id): ?string
+{
+    $newToken = generate_secure_token(24);
+    $stmt = $pdo->prepare('UPDATE bilik_suaras SET kiosk_token = :token WHERE id = :id');
+    $stmt->execute([
+        ':token' => $newToken,
+        ':id'    => $id,
+    ]);
+    return $stmt->rowCount() > 0 ? $newToken : null;
+}
+
+/**
+ * Memvalidasi apakah sesi browser saat ini berhak menampilkan layar kiosk untuk bilik tertentu
+ */
+function verify_bilik_kiosk_session(PDO $pdo, array $bilik): bool
+{
+    $bilikId = (int) ($bilik['id'] ?? 0);
+    if ($bilikId < 1 || empty($_SESSION['kiosk_booth_access'][$bilikId])) {
+        return false;
+    }
+
+    $token = ensure_bilik_kiosk_token($pdo, $bilik);
+    $expectedHash = hash('sha256', $token);
+    return hash_equals($expectedHash, (string) $_SESSION['kiosk_booth_access'][$bilikId]);
 }
 
 /**
